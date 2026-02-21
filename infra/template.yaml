@@ -62,7 +62,6 @@ Resources:
       MemorySize: !Ref LambdaMemorySize
       Environment:
         Variables:
-          AWS_REGION: !Ref AWS::Region
           DYNAMODB_TABLE: !Ref MailSyncerStateTable
           LOG_LEVEL: !Ref LogLevel
           SYNC_INTERVAL_SECONDS: !Sub "${SyncIntervalSeconds}"
