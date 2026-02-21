@@ -5,6 +5,7 @@ from typing import Any
 from src.config import ConfigError, is_dry_run_enabled, load_config
 from src.dynamodb_state import DynamoStateError, DynamoStateStore, DynamoUnavailableError
 from src.logging_utils import configure_logging, get_logger
+from src.secrets_config import SecretsConfigError
 from src.sync_engine import SyncEngine
 
 
@@ -43,6 +44,9 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         raise
     except ConfigError as exc:
         logger.error("configuration_error_abort", exc_info=exc)
+        raise
+    except SecretsConfigError as exc:
+        logger.error("secrets_configuration_error_abort", exc_info=exc)
         raise
 
     return {

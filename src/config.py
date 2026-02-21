@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from src.secrets_config import resolve_environment
 
 
 class ConfigError(ValueError):
@@ -174,7 +175,7 @@ def _load_route_objects(env: dict[str, str]) -> list[dict[str, Any]]:
 
 
 def load_config(env: dict[str, str] | None = None) -> AppConfig:
-    current_env = dict(os.environ if env is None else env)
+    current_env = resolve_environment(env)
     outlook_email = _required("OUTLOOK_EMAIL", current_env)
 
     route_objects = _load_route_objects(current_env)
@@ -280,5 +281,5 @@ def load_config(env: dict[str, str] | None = None) -> AppConfig:
 
 
 def is_dry_run_enabled(env: dict[str, str] | None = None) -> bool:
-    current_env = dict(os.environ if env is None else env)
+    current_env = resolve_environment(env)
     return _parse_bool(_env("DRY_RUN", current_env), default=False)

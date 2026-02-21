@@ -56,6 +56,10 @@ Resources:
                 - dynamodb:UpdateItem
                 - dynamodb:Query
               Resource: !GetAtt MailSyncerStateTable.Arn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: "*"
       Events:
         ScheduledSync:
           Type: Schedule
@@ -69,4 +73,3 @@ Outputs:
     Value: !Ref MailSyncerFunction
   StateTableName:
     Value: !Ref MailSyncerStateTable
-

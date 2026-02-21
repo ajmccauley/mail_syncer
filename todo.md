@@ -33,7 +33,7 @@ Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph
 - [x] Gmail IMAP auth via XOAUTH2.
 - [x] Outlook IMAP auth via XOAUTH2.
 - [x] Support refresh-token based headless operation.
-- [ ] Add interactive helper CLI command for initial token acquisition/refresh.
+- [x] Add interactive helper CLI command for initial token acquisition/refresh.
 - [x] Keep refresh tokens only in env/secrets file (never committed).
 
 ## 5) DynamoDB schema and idempotency
@@ -102,7 +102,7 @@ Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph
 ## 13) Config checklist
 - [x] Base: `AWS_REGION`, `DYNAMODB_TABLE`, `SYNC_INTERVAL_SECONDS=300`, `LOG_LEVEL=INFO`
 - [ ] Lambda: `AWS_LAMBDA_FUNCTION_NAME` (runtime-detected optional), timeout/memory/env configuration documented.
-- [ ] Secret storage: define whether tokens come from env vars, AWS Secrets Manager, or SSM Parameter Store.
+- [x] Secret storage: define whether tokens come from env vars, AWS Secrets Manager, or SSM Parameter Store.
 - [ ] GitHub Actions secrets/vars:
 - [x] `AWS_ROLE_ARN` (OIDC assume role target)
 - [x] `AWS_REGION`

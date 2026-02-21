@@ -32,6 +32,23 @@ pytest -q
 python -m src.main run-once --dry-run
 ```
 
+## First-Run OAuth Helpers
+Use local interactive flows to obtain refresh tokens (not inside Lambda):
+
+```bash
+python -m src.main auth gmail --client-id "$GMAIL_CLIENT_ID" --client-secret "$GMAIL_CLIENT_SECRET"
+python -m src.main auth microsoft --client-id "$MS_CLIENT_ID" --client-secret "$MS_CLIENT_SECRET" --tenant consumers
+```
+
+Optional direct write to Secrets Manager:
+
+```bash
+python -m src.main auth gmail --write-secret-id mail-syncer/routes --write-secret-key GMAIL_REFRESH_TOKEN
+python -m src.main auth microsoft --write-secret-id mail-syncer/outlook --write-secret-key MS_REFRESH_TOKEN
+```
+
+Both commands print JSON containing the new refresh token and an `env_export` snippet.
+
 ## AWS Deployment
 - GitHub Actions handles CI and deployment on `main` pushes.
 - Deployment template: `infra/template.yaml`.
@@ -42,3 +59,8 @@ python -m src.main run-once --dry-run
 
 ## Configuration
 Start with `.env.example` and set values from your secret manager.
+
+For Lambda, prefer AWS Secrets Manager:
+- Set `AWS_SECRETS_MANAGER_SECRET_IDS` to one or more secret IDs/ARNs.
+- Each secret must be a JSON object. Keys are merged into runtime env.
+- Explicit Lambda env vars override secret values.
