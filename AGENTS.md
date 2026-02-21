@@ -66,6 +66,9 @@ Use conventional commits:
 - `main` branch pushes trigger automatic AWS deployment via GitHub Actions.
 - Manual `workflow_dispatch` deploys are supported with deploy environment input.
 - Use GitHub OIDC to assume AWS role; do not store long-lived AWS keys in repo secrets.
+- IAM trust policy must allow GitHub OIDC `sub` values used by this workflow:
+- `repo:ajmccauley/mail_syncer:ref:refs/heads/main`
+- `repo:ajmccauley/mail_syncer:environment:production`
 - Required workflow stages: lint -> tests -> package -> deploy.
 - Deployment uses workflow concurrency control and uploads deploy logs as artifacts.
 - Deployment must remain idempotent (`--no-fail-on-empty-changeset`).
@@ -74,4 +77,5 @@ Use conventional commits:
 - Never commit secrets (`*_REFRESH_TOKEN`, client secrets, AWS credentials).
 - Use env vars, AWS Secrets Manager, or SSM Parameter Store; keep `.env.example` non-sensitive.
 - `AWS_SECRETS_MANAGER_SECRET_IDS` supports comma-separated JSON secrets merged at runtime.
+- Do not set Lambda-reserved environment keys (for example `AWS_REGION`) in SAM template env vars.
 - Fail safe on DynamoDB errors: do not perform IMAP actions when state backend is unavailable.

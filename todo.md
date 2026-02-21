@@ -2,7 +2,7 @@
 
 Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph) that copies new Gmail INBOX mail into Outlook.com folders with full RFC822 fidelity and strict idempotency.
 
-Status: all currently scoped tasks are complete.
+Status: implementation tasks are complete; live GitHub Actions deploy validation is in progress.
 
 ## 1) Scope and routing model (first)
 - [x] Confirm multi-route scope: multiple Gmail sources -> multiple destination folders in one Outlook mailbox.
