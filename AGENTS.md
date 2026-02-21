@@ -23,6 +23,7 @@ Use a local virtualenv and run modules from repo root.
 - `python -m src.main run-once --dry-run`: execute one sync cycle safely.
 - `python -m src.main lambda`: run one Lambda-style cycle locally.
 - `python -m src.main auth gmail` / `python -m src.main auth microsoft`: run interactive OAuth helpers.
+- `python3 scripts/check_latest_deploy.py`: inspect latest deploy run status and error-tail from logs/artifact.
 - `pytest -q`: run tests.
 - `ruff check src tests && ruff format src tests`: lint and format.
 - `act -l` (optional): list local GitHub Actions jobs if using `act`.

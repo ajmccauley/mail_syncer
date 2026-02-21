@@ -165,3 +165,27 @@ Required repo configuration:
 Branch/environment mapping:
 - `main` push -> `production` environment (default `DEPLOY_ENV=prod`)
 - manual dispatch can override target deploy environment through workflow inputs.
+
+## Deploy Log Checker Tool
+You can check the latest deploy run and inspect failures locally.
+
+Prerequisites:
+- GitHub CLI installed (`gh`)
+- Authenticated: `gh auth login`
+
+Command:
+```bash
+python3 scripts/check_latest_deploy.py
+```
+
+Useful options:
+```bash
+python3 scripts/check_latest_deploy.py --run-id 123456789
+python3 scripts/check_latest_deploy.py --tail-lines 200
+python3 scripts/check_latest_deploy.py --full-log
+```
+
+Exit codes:
+- `0`: latest deploy succeeded
+- `2`: deploy run exists but did not succeed
+- `3`: tooling/auth/retrieval error
