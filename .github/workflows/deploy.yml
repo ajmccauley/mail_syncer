@@ -18,6 +18,7 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_env || vars.DEPLOY_ENV || 'prod' }}
+  AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN || '' }}
   STACK_NAME: ${{ vars.STACK_NAME || '' }}
   SCHEDULE_EXPRESSION: ${{ vars.SCHEDULE_EXPRESSION || 'rate(5 minutes)' }}
   LAMBDA_MEMORY_SIZE: ${{ vars.LAMBDA_MEMORY_SIZE || '512' }}
@@ -43,10 +44,17 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Validate AWS auth configuration
+        run: |
+          if [ -z "${AWS_ROLE_ARN}" ]; then
+            echo "Missing AWS_ROLE_ARN. Set repository/environment secret AWS_ROLE_ARN (preferred) or variable AWS_ROLE_ARN."
+            exit 1
+          fi
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup SAM CLI

@@ -117,6 +117,7 @@ sam deploy \
 ### One-time GitHub setup (required)
 1. In repository **Settings -> Secrets and variables -> Actions**:
 - Secret: `AWS_ROLE_ARN` (OIDC-assumable deploy role in your AWS account)
+  - Fallback supported: repository/environment variable `AWS_ROLE_ARN`
 - Variables:
   - `AWS_REGION` (example: `us-west-2`)
   - `DEPLOY_ENV` (example: `prod`)
