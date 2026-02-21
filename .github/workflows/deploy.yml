@@ -20,7 +20,7 @@ env:
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_env || vars.DEPLOY_ENV || 'prod' }}
   AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN || '' }}
   STACK_NAME: ${{ vars.STACK_NAME || '' }}
-  SCHEDULE_EXPRESSION: ${{ vars.SCHEDULE_EXPRESSION || 'rate(5 minutes)' }}
+  SCHEDULE_EXPRESSION: ${{ vars.SCHEDULE_EXPRESSION || '' }}
   LAMBDA_MEMORY_SIZE: ${{ vars.LAMBDA_MEMORY_SIZE || '512' }}
   LAMBDA_TIMEOUT_SECONDS: ${{ vars.LAMBDA_TIMEOUT_SECONDS || '120' }}
   LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
@@ -67,6 +67,21 @@ jobs:
             echo "STACK_NAME=mail-syncer-${DEPLOY_ENV}" >> "${GITHUB_ENV}"
           fi
 
+      - name: Normalize deploy variables
+        run: |
+          SANITIZED_SECRETS="${AWS_SECRETS_MANAGER_SECRET_IDS#AWS_SECRETS_MANAGER_SECRET_IDS=}"
+          echo "AWS_SECRETS_MANAGER_SECRET_IDS=${SANITIZED_SECRETS}" >> "${GITHUB_ENV}"
+
+      - name: Handle rollback-complete stack
+        run: |
+          STACK_STATUS="$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)"
+          echo "Current stack status: ${STACK_STATUS:-NOT_FOUND}"
+          if [ "${STACK_STATUS}" = "ROLLBACK_COMPLETE" ]; then
+            echo "Deleting ROLLBACK_COMPLETE stack ${STACK_NAME} so deploy can recreate it..."
+            aws cloudformation delete-stack --stack-name "${STACK_NAME}"
+            aws cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}"
+          fi
+
       - name: Validate SAM template
         run: sam validate --template-file infra/template.yaml
 
@@ -76,6 +91,18 @@ jobs:
       - name: Deploy SAM application
         run: |
           set -o pipefail
+          PARAM_OVERRIDES=(
+            "DeployEnvironment=${DEPLOY_ENV}"
+            "LambdaMemorySize=${LAMBDA_MEMORY_SIZE}"
+            "LambdaTimeoutSeconds=${LAMBDA_TIMEOUT_SECONDS}"
+            "LogLevel=${LOG_LEVEL}"
+            "SyncIntervalSeconds=${SYNC_INTERVAL_SECONDS}"
+            "SecretsManagerSecretIds=${AWS_SECRETS_MANAGER_SECRET_IDS}"
+          )
+          if [ -n "${SCHEDULE_EXPRESSION}" ]; then
+            # Include quotes in value so SAM keeps expressions that contain spaces.
+            PARAM_OVERRIDES+=("ScheduleExpression=\"${SCHEDULE_EXPRESSION}\"")
+          fi
           sam deploy \
             --stack-name "${STACK_NAME}" \
             --template-file .aws-sam/build/template.yaml \
@@ -83,14 +110,7 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --resolve-s3 \
-            --parameter-overrides \
-              DeployEnvironment="${DEPLOY_ENV}" \
-              ScheduleExpression="${SCHEDULE_EXPRESSION}" \
-              LambdaMemorySize="${LAMBDA_MEMORY_SIZE}" \
-              LambdaTimeoutSeconds="${LAMBDA_TIMEOUT_SECONDS}" \
-              LogLevel="${LOG_LEVEL}" \
-              SyncIntervalSeconds="${SYNC_INTERVAL_SECONDS}" \
-              SecretsManagerSecretIds="${AWS_SECRETS_MANAGER_SECRET_IDS}" | tee deploy.log
+            --parameter-overrides "${PARAM_OVERRIDES[@]}" | tee deploy.log
 
       - name: Upload deployment logs
         if: always()

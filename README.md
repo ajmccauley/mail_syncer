@@ -122,6 +122,7 @@ sam deploy \
   - `AWS_REGION` (example: `us-west-2`)
   - `DEPLOY_ENV` (example: `prod`)
   - `AWS_SECRETS_MANAGER_SECRET_IDS` (example: `mail-syncer/routes,mail-syncer/outlook`)
+    - Set value only (no `KEY=` prefix).
   - Optional runtime tuning:
     - `STACK_NAME` (override default `mail-syncer-${DEPLOY_ENV}`)
     - `SCHEDULE_EXPRESSION` (example: `rate(5 minutes)`)
