@@ -40,6 +40,16 @@ class AppConfig:
     ms_tenant: str
     ms_refresh_token: str
     sync_interval_seconds: int
+    uidvalidity_resync_hours: int
+    uid_record_ttl_days: int
+    fail_record_ttl_days: int
+    imap_timeout_seconds: int
+    imap_max_retries: int
+    imap_retry_base_seconds: float
+    gmail_imap_host: str
+    gmail_imap_port: int
+    outlook_imap_host: str
+    outlook_imap_port: int
     log_level: str
     routes: tuple[RouteConfig, ...]
 
@@ -67,6 +77,20 @@ def _parse_bool(raw: str | None, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _parse_int(name: str, raw: str) -> int:
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be an integer") from exc
+
+
+def _parse_float(name: str, raw: str) -> float:
+    try:
+        return float(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a number") from exc
 
 
 def _load_routes_from_json(raw: str) -> list[dict[str, Any]]:
@@ -180,6 +204,57 @@ def load_config(env: dict[str, str] | None = None) -> AppConfig:
     if sync_interval_seconds <= 0:
         raise ConfigError("SYNC_INTERVAL_SECONDS must be greater than zero")
 
+    uidvalidity_resync_hours = _parse_int(
+        "UIDVALIDITY_RESYNC_HOURS",
+        _env("UIDVALIDITY_RESYNC_HOURS", current_env, "24") or "24",
+    )
+    if uidvalidity_resync_hours <= 0:
+        raise ConfigError("UIDVALIDITY_RESYNC_HOURS must be greater than zero")
+
+    uid_record_ttl_days = _parse_int(
+        "UID_RECORD_TTL_DAYS",
+        _env("UID_RECORD_TTL_DAYS", current_env, "365") or "365",
+    )
+    if uid_record_ttl_days <= 0:
+        raise ConfigError("UID_RECORD_TTL_DAYS must be greater than zero")
+
+    fail_record_ttl_days = _parse_int(
+        "FAIL_RECORD_TTL_DAYS",
+        _env("FAIL_RECORD_TTL_DAYS", current_env, "14") or "14",
+    )
+    if fail_record_ttl_days <= 0:
+        raise ConfigError("FAIL_RECORD_TTL_DAYS must be greater than zero")
+
+    imap_timeout_seconds = _parse_int(
+        "IMAP_TIMEOUT_SECONDS",
+        _env("IMAP_TIMEOUT_SECONDS", current_env, "30") or "30",
+    )
+    if imap_timeout_seconds <= 0:
+        raise ConfigError("IMAP_TIMEOUT_SECONDS must be greater than zero")
+
+    imap_max_retries = _parse_int(
+        "IMAP_MAX_RETRIES", _env("IMAP_MAX_RETRIES", current_env, "3") or "3"
+    )
+    if imap_max_retries <= 0:
+        raise ConfigError("IMAP_MAX_RETRIES must be greater than zero")
+
+    imap_retry_base_seconds = _parse_float(
+        "IMAP_RETRY_BASE_SECONDS",
+        _env("IMAP_RETRY_BASE_SECONDS", current_env, "1.0") or "1.0",
+    )
+    if imap_retry_base_seconds <= 0:
+        raise ConfigError("IMAP_RETRY_BASE_SECONDS must be greater than zero")
+
+    gmail_imap_host = _env("GMAIL_IMAP_HOST", current_env, "imap.gmail.com") or "imap.gmail.com"
+    gmail_imap_port = _parse_int("GMAIL_IMAP_PORT", _env("GMAIL_IMAP_PORT", current_env, "993") or "993")
+    outlook_imap_host = (
+        _env("OUTLOOK_IMAP_HOST", current_env, "outlook.office365.com")
+        or "outlook.office365.com"
+    )
+    outlook_imap_port = _parse_int(
+        "OUTLOOK_IMAP_PORT", _env("OUTLOOK_IMAP_PORT", current_env, "993") or "993"
+    )
+
     return AppConfig(
         aws_region=_required("AWS_REGION", current_env),
         dynamodb_table=_required("DYNAMODB_TABLE", current_env),
@@ -189,6 +264,16 @@ def load_config(env: dict[str, str] | None = None) -> AppConfig:
         ms_tenant=_env("MS_TENANT", current_env, "consumers") or "consumers",
         ms_refresh_token=_required("MS_REFRESH_TOKEN", current_env),
         sync_interval_seconds=sync_interval_seconds,
+        uidvalidity_resync_hours=uidvalidity_resync_hours,
+        uid_record_ttl_days=uid_record_ttl_days,
+        fail_record_ttl_days=fail_record_ttl_days,
+        imap_timeout_seconds=imap_timeout_seconds,
+        imap_max_retries=imap_max_retries,
+        imap_retry_base_seconds=imap_retry_base_seconds,
+        gmail_imap_host=gmail_imap_host,
+        gmail_imap_port=gmail_imap_port,
+        outlook_imap_host=outlook_imap_host,
+        outlook_imap_port=outlook_imap_port,
         log_level=_env("LOG_LEVEL", current_env, "INFO") or "INFO",
         routes=routes,
     )

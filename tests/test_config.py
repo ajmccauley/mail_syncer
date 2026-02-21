@@ -35,6 +35,8 @@ def test_load_config_from_sync_routes_json_multi_route() -> None:
     assert config.route_count == 2
     assert config.routes[0].outlook_email == "outlook@example.com"
     assert config.routes[1].gmail_email == "g2@example.com"
+    assert config.uidvalidity_resync_hours == 24
+    assert config.imap_max_retries == 3
 
 
 def test_load_config_single_route_fallback_mode() -> None:
@@ -53,4 +55,5 @@ def test_load_config_single_route_fallback_mode() -> None:
     config = load_config(env)
     assert config.route_count == 1
     assert config.routes[0].gmail_email == "g1@example.com"
-
+    assert config.gmail_imap_host == "imap.gmail.com"
+    assert config.outlook_imap_host == "outlook.office365.com"

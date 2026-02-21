@@ -32,6 +32,16 @@ def _test_config() -> AppConfig:
         ms_tenant="consumers",
         ms_refresh_token="ms-refresh",
         sync_interval_seconds=300,
+        uidvalidity_resync_hours=24,
+        uid_record_ttl_days=365,
+        fail_record_ttl_days=14,
+        imap_timeout_seconds=30,
+        imap_max_retries=3,
+        imap_retry_base_seconds=0.1,
+        gmail_imap_host="imap.gmail.com",
+        gmail_imap_port=993,
+        outlook_imap_host="outlook.office365.com",
+        outlook_imap_port=993,
         log_level="INFO",
         routes=(route,),
     )
@@ -50,4 +60,3 @@ def test_run_once_aborts_when_dynamodb_unavailable() -> None:
     )
     with pytest.raises(DynamoUnavailableError):
         engine.run_once(dry_run=True)
-

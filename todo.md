@@ -30,37 +30,37 @@ Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph
 - [x] If DynamoDB unavailable (network/auth/throttle): do not connect to IMAP, do not copy, exit non-zero.
 
 ## 4) OAuth2 and token lifecycle
-- [ ] Gmail IMAP auth via XOAUTH2.
-- [ ] Outlook IMAP auth via XOAUTH2.
+- [x] Gmail IMAP auth via XOAUTH2.
+- [x] Outlook IMAP auth via XOAUTH2.
 - [x] Support refresh-token based headless operation.
 - [ ] Add interactive helper CLI command for initial token acquisition/refresh.
 - [x] Keep refresh tokens only in env/secrets file (never committed).
 
 ## 5) DynamoDB schema and idempotency
-- [ ] Use one table.
-- [ ] PK per route: `ROUTE#<gmail_address>#DEST#<outlook_address>#FOLDER#<target_folder>`
-- [ ] SK items:
-- [ ] `WATERMARK` -> `uidvalidity`, `last_uid`, `updated_at`
-- [ ] `UID#<uidvalidity>#<gmail_uid>` -> `status`, `copied_at`, `message_id_header`, `rfc822_sha256`, `ttl`
-- [ ] `FAIL#<uidvalidity>#<gmail_uid>` -> `last_error`, `retry_count`, `updated_at`, `ttl`
-- [ ] Use conditional writes: create UID record with `attribute_not_exists(SK)` before copy.
-- [ ] Finalize UID record only after successful APPEND (`PENDING -> DONE`).
+- [x] Use one table.
+- [x] PK per route: `ROUTE#<gmail_address>#DEST#<outlook_address>#FOLDER#<target_folder>`
+- [x] SK items:
+- [x] `WATERMARK` -> `uidvalidity`, `last_uid`, `updated_at`
+- [x] `UID#<uidvalidity>#<gmail_uid>` -> `status`, `copied_at`, `message_id_header`, `rfc822_sha256`, `ttl`
+- [x] `FAIL#<uidvalidity>#<gmail_uid>` -> `last_error`, `retry_count`, `updated_at`, `ttl`
+- [x] Use conditional writes: create UID record with `attribute_not_exists(SK)` before copy.
+- [x] Finalize UID record only after successful APPEND (`PENDING -> DONE`).
 
 ## 6) Gmail incremental read strategy
-- [ ] Select INBOX, read `UIDVALIDITY`.
-- [ ] If unchanged: fetch UIDs greater than `last_uid`; retrieve RFC822 for new messages.
-- [ ] If changed: run fallback window (ex: 24h via `SEARCH SINCE`), dedupe by Message-ID and/or SHA256 stored in DynamoDB, then reset watermark.
-- [ ] Never delete/move/label/modify Gmail messages.
+- [x] Select INBOX, read `UIDVALIDITY`.
+- [x] If unchanged: fetch UIDs greater than `last_uid`; retrieve RFC822 for new messages.
+- [x] If changed: run fallback window (ex: 24h via `SEARCH SINCE`), dedupe by Message-ID and/or SHA256 stored in DynamoDB, then reset watermark.
+- [x] Never delete/move/label/modify Gmail messages.
 
 ## 7) Outlook destination write strategy
-- [ ] Connect to Outlook IMAP once per run where possible; reuse across routes.
-- [ ] Ensure each route target folder exists; create or fail clearly based on config.
-- [ ] APPEND raw RFC822 as-is; default to unread unless configured.
+- [x] Connect to Outlook IMAP once per run where possible; reuse across routes.
+- [x] Ensure each route target folder exists; create or fail clearly based on config.
+- [x] APPEND raw RFC822 as-is; default to unread unless configured.
 
 ## 8) Sync engine behavior
 - [x] Process routes independently within a single invocation.
-- [ ] On per-message APPEND failure: record `FAIL#...`, continue with remaining messages.
-- [ ] Add bounded retries with exponential backoff for transient IMAP/network errors.
+- [x] On per-message APPEND failure: record `FAIL#...`, continue with remaining messages.
+- [x] Add bounded retries with exponential backoff for transient IMAP/network errors.
 - [x] Add `--dry-run` to log candidate copies without APPEND.
 
 ## 9) Runtime and operations
@@ -69,12 +69,12 @@ Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph
 - [x] `lambda` (event-driven handler for scheduled execution)
 - [x] EventBridge schedule every `5 minutes` to invoke Lambda.
 - [x] Ensure Lambda timeout/memory are sized for worst-case batch and IMAP latency.
-- [ ] Ensure idempotent behavior across retries/re-invocations.
+- [x] Ensure idempotent behavior across retries/re-invocations.
 - [x] Structured JSON logging with `run_id` per cycle.
 
 ## 10) Tests (pytest)
-- [ ] DynamoDB idempotency conditional write/finalize behavior.
-- [ ] UIDVALIDITY change and fallback resync logic.
+- [x] DynamoDB idempotency conditional write/finalize behavior.
+- [x] UIDVALIDITY change and fallback resync logic.
 - [x] RFC822 SHA256 + Message-ID extraction.
 - [ ] Multi-route isolation (state for one route does not affect another).
 

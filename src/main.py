@@ -65,6 +65,16 @@ def _run_cycle(*, dry_run: bool) -> int:
                 "run_id": result.run_id,
                 "routes_processed": result.routes_processed,
                 "dry_run": dry_run,
+                "route_results": [
+                    {
+                        "route_id": route.route_id,
+                        "status": route.status,
+                        "copied": route.copied,
+                        "skipped_duplicates": route.skipped_duplicates,
+                        "failed": route.failed,
+                    }
+                    for route in result.route_results
+                ],
             }
         )
     )

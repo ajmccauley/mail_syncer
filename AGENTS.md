@@ -21,6 +21,7 @@ Use a local virtualenv and run modules from repo root.
 - `python -m venv .venv && source .venv/bin/activate`: create and activate env.
 - `pip install -r requirements.txt -r requirements-dev.txt`: install runtime/dev deps.
 - `python -m src.main run-once --dry-run`: execute one sync cycle safely.
+- `python -m src.main lambda`: run one Lambda-style cycle locally.
 - `pytest -q`: run tests.
 - `ruff check src tests && ruff format src tests`: lint and format.
 - `act -l` (optional): list local GitHub Actions jobs if using `act`.
@@ -42,7 +43,7 @@ Use a local virtualenv and run modules from repo root.
 - Add regression tests for each bug fix before merging.
 
 ## Commit & Pull Request Guidelines
-No existing commit history is available; use this convention going forward:
+Use conventional commits:
 
 - Commit format: `type(scope): short summary` (example: `feat(sync): add UIDVALIDITY fallback window`).
 - Keep commits focused and atomic; include tests/docs with behavior changes.
@@ -51,6 +52,13 @@ No existing commit history is available; use this convention going forward:
 - linked issue/task,
 - test evidence (`pytest` output),
 - config or operational impact (env vars, IAM, DynamoDB schema, workflow changes).
+
+## Sync Behavior Notes
+- Preserve Gmail source messages: no delete/move/label/modify operations.
+- Route state is isolated by PK (`ROUTE#<gmail>#DEST#<outlook>#FOLDER#<folder>`).
+- Maintain idempotency via DynamoDB conditional UID claim and finalize flow.
+- Keep route-level failures isolated; do not abort the whole invocation when one route fails.
+- Interactive OAuth token helper commands are not complete yet; use refresh-token-based headless config for now.
 
 ## CI/CD Deployment
 - `main` branch pushes trigger automatic AWS deployment via GitHub Actions.
