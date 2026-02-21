@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: mail-syncer lambda stack
+
+Parameters:
+  DeployEnvironment:
+    Type: String
+    Default: prod
+  AwsRegion:
+    Type: String
+    Default: us-east-1
+
+Resources:
+  MailSyncerStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "mail-syncer-state-${DeployEnvironment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  MailSyncerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "mail-syncer-${DeployEnvironment}"
+      Runtime: python3.11
+      Handler: src/lambda_handler.handler
+      CodeUri: ../
+      Timeout: 120
+      MemorySize: 512
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AwsRegion
+          DYNAMODB_TABLE: !Ref MailSyncerStateTable
+          LOG_LEVEL: INFO
+          SYNC_INTERVAL_SECONDS: "300"
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:DescribeTable
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource: !GetAtt MailSyncerStateTable.Arn
+      Events:
+        ScheduledSync:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Name: !Sub "mail-syncer-schedule-${DeployEnvironment}"
+            Enabled: true
+
+Outputs:
+  FunctionName:
+    Value: !Ref MailSyncerFunction
+  StateTableName:
+    Value: !Ref MailSyncerStateTable
+
