@@ -6,9 +6,30 @@ Parameters:
   DeployEnvironment:
     Type: String
     Default: prod
-  AwsRegion:
+  ScheduleExpression:
     Type: String
-    Default: us-east-1
+    Default: rate(5 minutes)
+  LambdaMemorySize:
+    Type: Number
+    Default: 512
+    MinValue: 128
+    MaxValue: 10240
+  LambdaTimeoutSeconds:
+    Type: Number
+    Default: 120
+    MinValue: 30
+    MaxValue: 900
+  LogLevel:
+    Type: String
+    Default: INFO
+  SyncIntervalSeconds:
+    Type: Number
+    Default: 300
+    MinValue: 60
+    MaxValue: 86400
+  SecretsManagerSecretIds:
+    Type: String
+    Default: ""
 
 Resources:
   MailSyncerStateTable:
@@ -37,14 +58,15 @@ Resources:
       Runtime: python3.11
       Handler: src/lambda_handler.handler
       CodeUri: ../
-      Timeout: 120
-      MemorySize: 512
+      Timeout: !Ref LambdaTimeoutSeconds
+      MemorySize: !Ref LambdaMemorySize
       Environment:
         Variables:
-          AWS_REGION: !Ref AwsRegion
+          AWS_REGION: !Ref AWS::Region
           DYNAMODB_TABLE: !Ref MailSyncerStateTable
-          LOG_LEVEL: INFO
-          SYNC_INTERVAL_SECONDS: "300"
+          LOG_LEVEL: !Ref LogLevel
+          SYNC_INTERVAL_SECONDS: !Sub "${SyncIntervalSeconds}"
+          AWS_SECRETS_MANAGER_SECRET_IDS: !Ref SecretsManagerSecretIds
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
@@ -64,12 +86,14 @@ Resources:
         ScheduledSync:
           Type: Schedule
           Properties:
-            Schedule: rate(5 minutes)
+            Schedule: !Ref ScheduleExpression
             Name: !Sub "mail-syncer-schedule-${DeployEnvironment}"
             Enabled: true
 
 Outputs:
   FunctionName:
     Value: !Ref MailSyncerFunction
+  FunctionArn:
+    Value: !GetAtt MailSyncerFunction.Arn
   StateTableName:
     Value: !Ref MailSyncerStateTable

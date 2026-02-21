@@ -16,8 +16,15 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_env || vars.DEPLOY_ENV || 'prod' }}
+  STACK_NAME: ${{ vars.STACK_NAME || '' }}
+  SCHEDULE_EXPRESSION: ${{ vars.SCHEDULE_EXPRESSION || 'rate(5 minutes)' }}
+  LAMBDA_MEMORY_SIZE: ${{ vars.LAMBDA_MEMORY_SIZE || '512' }}
+  LAMBDA_TIMEOUT_SECONDS: ${{ vars.LAMBDA_TIMEOUT_SECONDS || '120' }}
+  LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
+  SYNC_INTERVAL_SECONDS: ${{ vars.SYNC_INTERVAL_SECONDS || '300' }}
+  AWS_SECRETS_MANAGER_SECRET_IDS: ${{ vars.AWS_SECRETS_MANAGER_SECRET_IDS || '' }}
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -45,6 +52,15 @@ jobs:
       - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
 
+      - name: Resolve stack name
+        run: |
+          if [ -z "${STACK_NAME}" ]; then
+            echo "STACK_NAME=mail-syncer-${DEPLOY_ENV}" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Validate SAM template
+        run: sam validate --template-file infra/template.yaml
+
       - name: Build SAM application
         run: sam build --template-file infra/template.yaml
 
@@ -52,7 +68,7 @@ jobs:
         run: |
           set -o pipefail
           sam deploy \
-            --stack-name "mail-syncer-${DEPLOY_ENV}" \
+            --stack-name "${STACK_NAME}" \
             --template-file .aws-sam/build/template.yaml \
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
@@ -60,7 +76,12 @@ jobs:
             --resolve-s3 \
             --parameter-overrides \
               DeployEnvironment="${DEPLOY_ENV}" \
-              AwsRegion="${AWS_REGION}" | tee deploy.log
+              ScheduleExpression="${SCHEDULE_EXPRESSION}" \
+              LambdaMemorySize="${LAMBDA_MEMORY_SIZE}" \
+              LambdaTimeoutSeconds="${LAMBDA_TIMEOUT_SECONDS}" \
+              LogLevel="${LOG_LEVEL}" \
+              SyncIntervalSeconds="${SYNC_INTERVAL_SECONDS}" \
+              SecretsManagerSecretIds="${AWS_SECRETS_MANAGER_SECRET_IDS}" | tee deploy.log
 
       - name: Upload deployment logs
         if: always()

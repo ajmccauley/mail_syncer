@@ -94,7 +94,8 @@ Secrets loading:
 - Explicit env vars override secret values.
 
 ## AWS Lambda Deployment
-Deployment is via SAM template `infra/template.yaml`.
+Deployment is via **AWS SAM**, which generates and deploys **CloudFormation**.  
+So the deploy path is: GitHub Action -> `sam build/deploy` -> CloudFormation stack updates.
 
 ### What gets created
 - Lambda function (`src/lambda_handler.handler`)
@@ -112,6 +113,23 @@ sam deploy \
   --no-fail-on-empty-changeset \
   --resolve-s3
 ```
+
+### One-time GitHub setup (required)
+1. In repository **Settings -> Secrets and variables -> Actions**:
+- Secret: `AWS_ROLE_ARN` (OIDC-assumable deploy role in your AWS account)
+- Variables:
+  - `AWS_REGION` (example: `us-west-2`)
+  - `DEPLOY_ENV` (example: `prod`)
+  - `AWS_SECRETS_MANAGER_SECRET_IDS` (example: `mail-syncer/routes,mail-syncer/outlook`)
+  - Optional runtime tuning:
+    - `STACK_NAME` (override default `mail-syncer-${DEPLOY_ENV}`)
+    - `SCHEDULE_EXPRESSION` (example: `rate(5 minutes)`)
+    - `LAMBDA_MEMORY_SIZE` (example: `512`)
+    - `LAMBDA_TIMEOUT_SECONDS` (example: `120`)
+    - `LOG_LEVEL` (example: `INFO`)
+    - `SYNC_INTERVAL_SECONDS` (example: `300`)
+2. In **Settings -> Environments -> production**, add reviewers if you want approval gates.
+3. Ensure IAM role in `AWS_ROLE_ARN` trusts GitHub OIDC and allows CloudFormation/SAM/Lambda/DynamoDB/EventBridge/Logs/Secrets actions for this stack.
 
 ### IAM notes
 Least privilege for runtime should include:
@@ -135,10 +153,11 @@ Do not attach Lambda to a VPC unless your org/network policy requires it. IMAP e
 - AWS auth uses GitHub OIDC with `AWS_ROLE_ARN`.
 - Deploy uses `--no-fail-on-empty-changeset` for idempotent re-runs.
 - Deployment logs are uploaded as workflow artifacts.
+- Deploy workflow validates template, builds SAM artifacts, then deploys CloudFormation stack.
 
 Required repo configuration:
 - Secret: `AWS_ROLE_ARN`
-- Variables: `AWS_REGION`, `DEPLOY_ENV`
+- Variables: `AWS_REGION`, `DEPLOY_ENV`, `AWS_SECRETS_MANAGER_SECRET_IDS`
 - Environment protection: configure required reviewers on GitHub `production` environment if needed.
 
 Branch/environment mapping:
