@@ -151,6 +151,7 @@ Do not attach Lambda to a VPC unless your org/network policy requires it. IMAP e
 ## GitHub Actions CI/CD
 - `ci.yml`: lint + tests on PRs/pushes.
 - `deploy.yml`: deploy on `main` pushes and manual dispatch.
+- Add `[skip deploy]` to a commit message to skip deploy on push while still running CI.
 - AWS auth uses GitHub OIDC with `AWS_ROLE_ARN`.
 - Deploy uses `--no-fail-on-empty-changeset` for idempotent re-runs.
 - Deployment logs are uploaded as workflow artifacts.
