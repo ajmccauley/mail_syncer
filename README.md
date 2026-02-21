@@ -62,7 +62,7 @@ python -m src.main auth gmail \
 
 ### Microsoft (Outlook IMAP)
 1. Azure App Registration (`tenant=consumers` for personal Outlook).
-2. Redirect URI: `http://127.0.0.1:8766/callback`.
+2. Redirect URI: `http://localhost:8766/callback`.
 3. Delegated permission: `IMAP.AccessAsUser.All` (+ `offline_access` scope).
 4. Run:
 ```bash

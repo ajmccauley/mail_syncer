@@ -65,7 +65,7 @@ def _build_parser() -> argparse.ArgumentParser:
     auth_microsoft.add_argument("--client-id")
     auth_microsoft.add_argument("--client-secret", default=None)
     auth_microsoft.add_argument("--scope", default=MS_DEFAULT_SCOPE)
-    auth_microsoft.add_argument("--listen-host", default="127.0.0.1")
+    auth_microsoft.add_argument("--listen-host", default="localhost")
     auth_microsoft.add_argument("--listen-port", type=int, default=8766)
     auth_microsoft.add_argument("--timeout-seconds", type=int, default=180)
     auth_microsoft.add_argument("--no-browser", action="store_true")

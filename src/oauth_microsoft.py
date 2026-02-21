@@ -87,7 +87,7 @@ def interactive_token_helper(
     client_id: str,
     client_secret: str | None,
     scope: str = MS_DEFAULT_SCOPE,
-    listen_host: str = "127.0.0.1",
+    listen_host: str = "localhost",
     listen_port: int = 8766,
     timeout_seconds: int = 180,
     open_browser: bool = True,
@@ -238,4 +238,3 @@ def _wait_for_auth_code(
     if callback_data.get("state") != expected_state:
         raise OAuthError("OAuth state mismatch; possible CSRF or stale callback")
     return callback_data
-
