@@ -44,7 +44,9 @@ class FakeDynamoClient:
         self._items.pop(key, None)
         return {}
 
-    def query(self, *, ExpressionAttributeValues: dict[str, Any], **_: Any) -> dict[str, Any]:
+    def query(
+        self, *, ExpressionAttributeValues: dict[str, Any], **_: Any
+    ) -> dict[str, Any]:
         pk = ExpressionAttributeValues[":pk"]["S"]
         prefix = ExpressionAttributeValues[":prefix"]["S"]
         results = []
@@ -117,4 +119,3 @@ def test_record_failure_increments_retry_count() -> None:
     )["Item"]
     assert fail_item["retry_count"]["N"] == "2"
     assert fail_item["last_error"]["S"] == "second"
-

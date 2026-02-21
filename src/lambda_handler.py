@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from src.config import ConfigError, is_dry_run_enabled, load_config
-from src.dynamodb_state import DynamoStateError, DynamoStateStore, DynamoUnavailableError
+from src.dynamodb_state import (
+    DynamoStateError,
+    DynamoStateStore,
+    DynamoUnavailableError,
+)
 from src.logging_utils import configure_logging, get_logger
 from src.secrets_config import SecretsConfigError
 from src.sync_engine import SyncEngine

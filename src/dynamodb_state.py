@@ -80,7 +80,9 @@ class DynamoStateStore:
         try:
             import boto3
         except ImportError as exc:  # pragma: no cover
-            raise DynamoStateError("boto3 is required for DynamoDB state access") from exc
+            raise DynamoStateError(
+                "boto3 is required for DynamoDB state access"
+            ) from exc
         return boto3.client("dynamodb", region_name=region_name)
 
     @staticmethod
@@ -153,7 +155,9 @@ class DynamoStateStore:
         try:
             response = self._client.get_item(
                 TableName=self.table_name,
-                Key=self._key(pk=pk, sk=self.uid_sk(uidvalidity=uidvalidity, gmail_uid=gmail_uid)),
+                Key=self._key(
+                    pk=pk, sk=self.uid_sk(uidvalidity=uidvalidity, gmail_uid=gmail_uid)
+                ),
                 ConsistentRead=True,
             )
         except Exception as exc:
@@ -244,7 +248,9 @@ class DynamoStateStore:
                 Key=self._key(pk=pk, sk=sk),
                 ConsistentRead=True,
             )
-            existing_item = existing.get("Item", {}) if isinstance(existing, dict) else {}
+            existing_item = (
+                existing.get("Item", {}) if isinstance(existing, dict) else {}
+            )
             retry_count = (_get_n(existing_item, "retry_count") or 0) + 1
             self._client.put_item(
                 TableName=self.table_name,
@@ -307,8 +313,9 @@ class DynamoStateStore:
             for item in page:
                 if isinstance(item, dict):
                     items.append(item)
-            last_key = response.get("LastEvaluatedKey") if isinstance(response, dict) else None
+            last_key = (
+                response.get("LastEvaluatedKey") if isinstance(response, dict) else None
+            )
             if not last_key:
                 break
         return items
-

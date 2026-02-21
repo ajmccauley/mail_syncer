@@ -123,20 +123,22 @@ def _route_from_object(
     gmail_email = str(route_obj.get("gmail_email") or "").strip() or _required(
         "GMAIL_EMAIL", env
     )
-    outlook_target_folder = str(route_obj.get("outlook_target_folder") or "").strip() or _required(
-        "OUTLOOK_TARGET_FOLDER", env
+    outlook_target_folder = str(
+        route_obj.get("outlook_target_folder") or ""
+    ).strip() or _required("OUTLOOK_TARGET_FOLDER", env)
+    outlook_email = (
+        str(route_obj.get("outlook_email") or "").strip() or default_outlook_email
     )
-    outlook_email = str(route_obj.get("outlook_email") or "").strip() or default_outlook_email
 
     gmail_client_id = str(route_obj.get("gmail_client_id") or "").strip() or _required(
         "GMAIL_CLIENT_ID", env
     )
-    gmail_client_secret = str(route_obj.get("gmail_client_secret") or "").strip() or _required(
-        "GMAIL_CLIENT_SECRET", env
-    )
-    gmail_refresh_token = str(route_obj.get("gmail_refresh_token") or "").strip() or _required(
-        "GMAIL_REFRESH_TOKEN", env
-    )
+    gmail_client_secret = str(
+        route_obj.get("gmail_client_secret") or ""
+    ).strip() or _required("GMAIL_CLIENT_SECRET", env)
+    gmail_refresh_token = str(
+        route_obj.get("gmail_refresh_token") or ""
+    ).strip() or _required("GMAIL_REFRESH_TOKEN", env)
     create_target_folder = _parse_bool(
         str(route_obj.get("create_target_folder"))
         if "create_target_folder" in route_obj
@@ -246,8 +248,12 @@ def load_config(env: dict[str, str] | None = None) -> AppConfig:
     if imap_retry_base_seconds <= 0:
         raise ConfigError("IMAP_RETRY_BASE_SECONDS must be greater than zero")
 
-    gmail_imap_host = _env("GMAIL_IMAP_HOST", current_env, "imap.gmail.com") or "imap.gmail.com"
-    gmail_imap_port = _parse_int("GMAIL_IMAP_PORT", _env("GMAIL_IMAP_PORT", current_env, "993") or "993")
+    gmail_imap_host = (
+        _env("GMAIL_IMAP_HOST", current_env, "imap.gmail.com") or "imap.gmail.com"
+    )
+    gmail_imap_port = _parse_int(
+        "GMAIL_IMAP_PORT", _env("GMAIL_IMAP_PORT", current_env, "993") or "993"
+    )
     outlook_imap_host = (
         _env("OUTLOOK_IMAP_HOST", current_env, "outlook.office365.com")
         or "outlook.office365.com"

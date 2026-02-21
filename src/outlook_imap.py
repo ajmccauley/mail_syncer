@@ -41,11 +41,15 @@ class OutlookImapClient:
                 self.host, self.port, timeout=self.timeout_seconds
             )
             xoauth2 = build_xoauth2_string(self.email_address, self.access_token)
-            result, _ = self._imap.authenticate("XOAUTH2", lambda _: xoauth2.encode("utf-8"))
+            result, _ = self._imap.authenticate(
+                "XOAUTH2", lambda _: xoauth2.encode("utf-8")
+            )
             if result != "OK":
                 raise OutlookImapError("Outlook XOAUTH2 authentication failed")
         except Exception as exc:
-            raise OutlookImapError(f"Outlook IMAP connection/auth failed: {exc}") from exc
+            raise OutlookImapError(
+                f"Outlook IMAP connection/auth failed: {exc}"
+            ) from exc
 
     def close(self) -> None:
         if self._imap is None:
@@ -77,4 +81,3 @@ class OutlookImapClient:
         typ, data = self._imap.append(folder_name, None, None, raw_rfc822)
         if typ != "OK":
             raise OutlookImapError(f"Outlook APPEND failed: {typ} {data}")
-

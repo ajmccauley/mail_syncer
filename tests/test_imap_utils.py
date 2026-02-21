@@ -21,4 +21,3 @@ def test_rfc822_sha256_is_stable() -> None:
     second = rfc822_sha256(raw)
     assert first == second
     assert len(first) == 64
-

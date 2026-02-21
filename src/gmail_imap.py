@@ -49,7 +49,9 @@ class GmailImapClient:
                 self.host, self.port, timeout=self.timeout_seconds
             )
             xoauth2 = build_xoauth2_string(self.email_address, self.access_token)
-            result, _ = self._imap.authenticate("XOAUTH2", lambda _: xoauth2.encode("utf-8"))
+            result, _ = self._imap.authenticate(
+                "XOAUTH2", lambda _: xoauth2.encode("utf-8")
+            )
             if result != "OK":
                 raise GmailImapError("Gmail XOAUTH2 authentication failed")
         except Exception as exc:
@@ -77,7 +79,9 @@ class GmailImapClient:
         try:
             return int(uidvalidity_raw)
         except (TypeError, ValueError) as exc:
-            raise GmailImapError(f"Unable to parse UIDVALIDITY from Gmail response: {response}") from exc
+            raise GmailImapError(
+                f"Unable to parse UIDVALIDITY from Gmail response: {response}"
+            ) from exc
 
     def search_uids_after(self, *, last_uid: int) -> list[int]:
         self._select_inbox()
@@ -101,7 +105,11 @@ class GmailImapClient:
         if typ != "OK":
             raise GmailImapError(f"Gmail UID FETCH failed for {uid}: {typ} {data}")
         for part in data:
-            if isinstance(part, tuple) and len(part) > 1 and isinstance(part[1], (bytes, bytearray)):
+            if (
+                isinstance(part, tuple)
+                and len(part) > 1
+                and isinstance(part[1], (bytes, bytearray))
+            ):
                 return bytes(part[1])
         raise GmailImapError(f"Gmail UID FETCH returned no RFC822 payload for {uid}")
 
@@ -134,4 +142,3 @@ def _parse_uid_list(data: Any) -> list[int]:
         except ValueError:
             continue
     return sorted(set(uids))
-

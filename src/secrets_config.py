@@ -31,7 +31,9 @@ def resolve_environment(
         return base_env
 
     resolved: dict[str, str] = {}
-    client = secrets_client or _default_secrets_client(region_name=base_env.get("AWS_REGION"))
+    client = secrets_client or _default_secrets_client(
+        region_name=base_env.get("AWS_REGION")
+    )
     for secret_id in secret_ids:
         payload = _load_secret_payload(client=client, secret_id=secret_id)
         for key, value in payload.items():
@@ -53,7 +55,9 @@ def _default_secrets_client(*, region_name: str | None) -> Any:
     try:
         import boto3
     except ImportError as exc:  # pragma: no cover
-        raise SecretsConfigError("boto3 is required for Secrets Manager loading") from exc
+        raise SecretsConfigError(
+            "boto3 is required for Secrets Manager loading"
+        ) from exc
     kwargs: dict[str, Any] = {}
     if region_name:
         kwargs["region_name"] = region_name
@@ -80,4 +84,3 @@ def _load_secret_payload(*, client: Any, secret_id: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SecretsConfigError(f"Secret {secret_id} must contain a JSON object")
     return payload
-

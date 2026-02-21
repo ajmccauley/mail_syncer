@@ -66,12 +66,14 @@ class SyncEngine:
         self.state_store.assert_available()
 
         outlook_access_token = self._with_retry(
-            lambda: self.ms_refresh_fn(
-                tenant=self.config.ms_tenant,
-                client_id=self.config.ms_client_id,
-                client_secret=self.config.ms_client_secret,
-                refresh_token=self.config.ms_refresh_token,
-            ).access_token,
+            lambda: (
+                self.ms_refresh_fn(
+                    tenant=self.config.ms_tenant,
+                    client_id=self.config.ms_client_id,
+                    client_secret=self.config.ms_client_secret,
+                    refresh_token=self.config.ms_refresh_token,
+                ).access_token
+            ),
             operation_name="ms_access_token_refresh",
             run_id=run_id,
             route_id=None,
@@ -152,11 +154,13 @@ class SyncEngine:
         watermark = self.state_store.get_watermark(pk=pk)
 
         gmail_access_token = self._with_retry(
-            lambda: self.gmail_refresh_fn(
-                client_id=route.gmail_client_id,
-                client_secret=route.gmail_client_secret,
-                refresh_token=route.gmail_refresh_token,
-            ).access_token,
+            lambda: (
+                self.gmail_refresh_fn(
+                    client_id=route.gmail_client_id,
+                    client_secret=route.gmail_client_secret,
+                    refresh_token=route.gmail_refresh_token,
+                ).access_token
+            ),
             operation_name="gmail_access_token_refresh",
             run_id=run_id,
             route_id=route.route_id,
@@ -200,7 +204,8 @@ class SyncEngine:
             )
 
             uidvalidity_changed = (
-                watermark.uidvalidity is not None and watermark.uidvalidity != current_uidvalidity
+                watermark.uidvalidity is not None
+                and watermark.uidvalidity != current_uidvalidity
             )
             if uidvalidity_changed:
                 since_date = (
@@ -331,9 +336,7 @@ class SyncEngine:
                 )
 
             status = "ok" if failed == 0 else "partial_failure"
-            detail = (
-                f"copied={copied}, skipped_duplicates={skipped_duplicates}, failed={failed}"
-            )
+            detail = f"copied={copied}, skipped_duplicates={skipped_duplicates}, failed={failed}"
             return RouteRunResult(
                 route_id=route.route_id,
                 status=status,
@@ -363,7 +366,13 @@ class SyncEngine:
         for attempt in range(1, max_attempts + 1):
             try:
                 return fn()
-            except (GmailImapError, OutlookImapError, OSError, TimeoutError, RuntimeError) as exc:
+            except (
+                GmailImapError,
+                OutlookImapError,
+                OSError,
+                TimeoutError,
+                RuntimeError,
+            ) as exc:
                 last_exc = exc
                 self.logger.warning(
                     "operation_retryable_error",

@@ -26,4 +26,3 @@ def extract_message_id(raw_message: bytes) -> str | None:
     if not message_id:
         return None
     return message_id.strip()
-

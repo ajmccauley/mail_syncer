@@ -6,7 +6,11 @@ import sys
 from typing import Any
 
 from src.config import ConfigError, is_dry_run_enabled, load_config
-from src.dynamodb_state import DynamoStateError, DynamoStateStore, DynamoUnavailableError
+from src.dynamodb_state import (
+    DynamoStateError,
+    DynamoStateStore,
+    DynamoUnavailableError,
+)
 from src.logging_utils import configure_logging, get_logger
 from src.oauth_gmail import (
     GMAIL_DEFAULT_SCOPE,
@@ -46,7 +50,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     auth_subparsers = auth_parser.add_subparsers(dest="auth_provider", required=True)
 
-    auth_gmail = auth_subparsers.add_parser("gmail", help="Run Gmail OAuth consent flow")
+    auth_gmail = auth_subparsers.add_parser(
+        "gmail", help="Run Gmail OAuth consent flow"
+    )
     auth_gmail.add_argument("--client-id")
     auth_gmail.add_argument("--client-secret")
     auth_gmail.add_argument("--scope", default=GMAIL_DEFAULT_SCOPE)
@@ -129,7 +135,9 @@ def _secrets_client(*, region_name: str | None) -> Any:
     try:
         import boto3
     except ImportError as exc:
-        raise RuntimeError("boto3 is required for writing AWS Secrets Manager values") from exc
+        raise RuntimeError(
+            "boto3 is required for writing AWS Secrets Manager values"
+        ) from exc
     kwargs: dict[str, Any] = {}
     if region_name:
         kwargs["region_name"] = region_name

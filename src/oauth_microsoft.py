@@ -166,7 +166,9 @@ def _build_auth_url(
     return f"{base}?{query}"
 
 
-def _post_form(url: str, *, payload: dict[str, str], timeout_seconds: int) -> dict[str, object]:
+def _post_form(
+    url: str, *, payload: dict[str, str], timeout_seconds: int
+) -> dict[str, object]:
     body = urllib.parse.urlencode(payload).encode("utf-8")
     request = urllib.request.Request(
         url,

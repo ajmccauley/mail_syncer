@@ -18,7 +18,9 @@ class FakeSecretsClient:
         return {"SecretString": json.dumps(self.payloads[SecretId])}
 
 
-def test_resolve_environment_merges_multiple_secrets_and_preserves_env_override() -> None:
+def test_resolve_environment_merges_multiple_secrets_and_preserves_env_override() -> (
+    None
+):
     env = {
         "AWS_REGION": "us-east-1",
         "AWS_SECRETS_MANAGER_SECRET_IDS": "s1, s2",
@@ -49,4 +51,3 @@ def test_resolve_environment_raises_for_invalid_secret_payload() -> None:
             },
             secrets_client=BadSecretsClient(),
         )
-

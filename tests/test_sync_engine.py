@@ -45,7 +45,9 @@ class FakeStateStore:
 
     def set_watermark(self, *, pk: str, uidvalidity: int, last_uid: int) -> None:
         self.set_watermark_calls.append((uidvalidity, last_uid))
-        self._watermarks_by_pk[pk] = Watermark(uidvalidity=uidvalidity, last_uid=last_uid)
+        self._watermarks_by_pk[pk] = Watermark(
+            uidvalidity=uidvalidity, last_uid=last_uid
+        )
         self.set_watermark_by_pk.append((pk, uidvalidity, last_uid))
 
     def payload_already_copied(

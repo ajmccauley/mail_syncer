@@ -139,7 +139,9 @@ def interactive_token_helper(
     )
 
 
-def _build_auth_url(*, client_id: str, redirect_uri: str, scope: str, state: str) -> str:
+def _build_auth_url(
+    *, client_id: str, redirect_uri: str, scope: str, state: str
+) -> str:
     query = urllib.parse.urlencode(
         {
             "client_id": client_id,
@@ -154,7 +156,9 @@ def _build_auth_url(*, client_id: str, redirect_uri: str, scope: str, state: str
     return f"{GMAIL_AUTH_URL}?{query}"
 
 
-def _post_form(url: str, *, payload: dict[str, str], timeout_seconds: int) -> dict[str, object]:
+def _post_form(
+    url: str, *, payload: dict[str, str], timeout_seconds: int
+) -> dict[str, object]:
     body = urllib.parse.urlencode(payload).encode("utf-8")
     request = urllib.request.Request(
         url,
@@ -226,4 +230,3 @@ def _wait_for_auth_code(
     if callback_data.get("state") != expected_state:
         raise OAuthError("OAuth state mismatch; possible CSRF or stale callback")
     return callback_data
-
