@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      deploy_env:
+        description: "Deployment environment name"
+        required: false
+        default: "prod"
 
 permissions:
   id-token: write
@@ -12,7 +17,11 @@ permissions:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
-  DEPLOY_ENV: ${{ vars.DEPLOY_ENV }}
+  DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_env || vars.DEPLOY_ENV || 'prod' }}
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -41,6 +50,7 @@ jobs:
 
       - name: Deploy SAM application
         run: |
+          set -o pipefail
           sam deploy \
             --stack-name "mail-syncer-${DEPLOY_ENV}" \
             --template-file .aws-sam/build/template.yaml \
@@ -50,5 +60,11 @@ jobs:
             --resolve-s3 \
             --parameter-overrides \
               DeployEnvironment="${DEPLOY_ENV}" \
-              AwsRegion="${AWS_REGION}"
+              AwsRegion="${AWS_REGION}" | tee deploy.log
 
+      - name: Upload deployment logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-log-${{ github.run_id }}
+          path: deploy.log

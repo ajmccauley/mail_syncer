@@ -16,14 +16,23 @@ class FakeToken:
 
 
 class FakeStateStore:
-    def __init__(self, *, watermark: Watermark, duplicate_hashes: set[str] | None = None) -> None:
-        self._watermark = watermark
+    def __init__(
+        self,
+        *,
+        watermark: Watermark | None = None,
+        watermarks_by_pk: dict[str, Watermark] | None = None,
+        duplicate_hashes: set[str] | None = None,
+    ) -> None:
+        self._default_watermark = watermark or Watermark(uidvalidity=None, last_uid=0)
+        self._watermarks_by_pk = dict(watermarks_by_pk or {})
         self.duplicate_hashes = duplicate_hashes or set()
         self.finalized: list[tuple[int, int]] = []
         self.failures: list[tuple[int, int, str]] = []
         self.abandoned: list[tuple[int, int]] = []
         self.claimed: list[tuple[int, int]] = []
         self.set_watermark_calls: list[tuple[int, int]] = []
+        self.claimed_by_pk: list[tuple[str, int, int]] = []
+        self.set_watermark_by_pk: list[tuple[str, int, int]] = []
 
     def assert_available(self) -> None:
         return None
@@ -32,11 +41,12 @@ class FakeStateStore:
         return f"ROUTE#{gmail_email}#{outlook_email}#{folder}"
 
     def get_watermark(self, *, pk: str) -> Watermark:
-        return self._watermark
+        return self._watermarks_by_pk.get(pk, self._default_watermark)
 
     def set_watermark(self, *, pk: str, uidvalidity: int, last_uid: int) -> None:
         self.set_watermark_calls.append((uidvalidity, last_uid))
-        self._watermark = Watermark(uidvalidity=uidvalidity, last_uid=last_uid)
+        self._watermarks_by_pk[pk] = Watermark(uidvalidity=uidvalidity, last_uid=last_uid)
+        self.set_watermark_by_pk.append((pk, uidvalidity, last_uid))
 
     def payload_already_copied(
         self, *, pk: str, message_id_header: str | None, rfc822_sha256: str
@@ -48,6 +58,7 @@ class FakeStateStore:
 
     def claim_uid_copy(self, *, pk: str, uidvalidity: int, gmail_uid: int) -> bool:
         self.claimed.append((uidvalidity, gmail_uid))
+        self.claimed_by_pk.append((pk, uidvalidity, gmail_uid))
         return True
 
     def finalize_uid_copy(
@@ -135,14 +146,23 @@ class FakeOutlookClient:
 
 
 def _base_config() -> AppConfig:
-    route = RouteConfig(
-        gmail_email="g1@example.com",
-        gmail_client_id="gid",
-        gmail_client_secret="gsecret",
-        gmail_refresh_token="grefresh",
+    route = _route("g1@example.com", "Inbox/Gmail-1")
+    return _config_for_routes((route,))
+
+
+def _route(gmail_email: str, folder: str) -> RouteConfig:
+    token_key = gmail_email.split("@")[0]
+    return RouteConfig(
+        gmail_email=gmail_email,
+        gmail_client_id=f"{token_key}-gid",
+        gmail_client_secret=f"{token_key}-gsecret",
+        gmail_refresh_token=f"{token_key}-grefresh",
         outlook_email="outlook@example.com",
-        outlook_target_folder="Inbox/Gmail-1",
+        outlook_target_folder=folder,
     )
+
+
+def _config_for_routes(routes: tuple[RouteConfig, ...]) -> AppConfig:
     return AppConfig(
         aws_region="us-east-1",
         dynamodb_table="state-table",
@@ -163,7 +183,7 @@ def _base_config() -> AppConfig:
         outlook_imap_host="outlook.office365.com",
         outlook_imap_port=993,
         log_level="INFO",
-        routes=(route,),
+        routes=routes,
     )
 
 
@@ -254,3 +274,55 @@ def test_route_continues_on_append_failure_and_keeps_replay_window() -> None:
     assert state.failures and state.failures[0][1] == 102
     assert state.set_watermark_calls[-1] == (300, 101)
 
+
+def test_multi_route_state_isolation_uses_route_specific_keys() -> None:
+    route1 = _route("g1@example.com", "Inbox/Gmail-1")
+    route2 = _route("g2@example.com", "Inbox/Gmail-2")
+    config = _config_for_routes((route1, route2))
+
+    pk1 = f"ROUTE#{route1.gmail_email}#{route1.outlook_email}#{route1.outlook_target_folder}"
+    pk2 = f"ROUTE#{route2.gmail_email}#{route2.outlook_email}#{route2.outlook_target_folder}"
+    state = FakeStateStore(
+        watermarks_by_pk={
+            pk1: Watermark(uidvalidity=700, last_uid=10),
+            pk2: Watermark(uidvalidity=800, last_uid=20),
+        }
+    )
+    gmail_clients = {
+        "g1@example.com": FakeGmailClient(
+            uidvalidity=700,
+            uids_after=[11],
+            uids_since=[],
+            messages={11: _gmail_message(11, "g1")},
+        ),
+        "g2@example.com": FakeGmailClient(
+            uidvalidity=800,
+            uids_after=[21],
+            uids_since=[],
+            messages={21: _gmail_message(21, "g2")},
+        ),
+    }
+    outlook = FakeOutlookClient()
+
+    def gmail_factory(**kwargs: object) -> FakeGmailClient:
+        return gmail_clients[str(kwargs["email_address"])]
+
+    engine = SyncEngine(
+        config=config,
+        state_store=state,  # type: ignore[arg-type]
+        logger=logging.getLogger("test"),
+        gmail_refresh_fn=lambda **_: FakeToken(access_token="gmail-token"),
+        ms_refresh_fn=lambda **_: FakeToken(access_token="ms-token"),
+        gmail_client_factory=gmail_factory,  # type: ignore[arg-type]
+        outlook_client_factory=lambda **_: outlook,  # type: ignore[arg-type]
+        sleep_fn=lambda _: None,
+    )
+
+    result = engine.run_once(dry_run=False)
+
+    assert result.routes_processed == 2
+    assert {route.status for route in result.route_results} == {"ok"}
+    assert (pk1, 700, 11) in state.set_watermark_by_pk
+    assert (pk2, 800, 21) in state.set_watermark_by_pk
+    assert (pk1, 700, 11) in state.claimed_by_pk
+    assert (pk2, 800, 21) in state.claimed_by_pk

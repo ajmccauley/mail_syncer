@@ -2,6 +2,8 @@
 
 Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph) that copies new Gmail INBOX mail into Outlook.com folders with full RFC822 fidelity and strict idempotency.
 
+Status: all currently scoped tasks are complete.
+
 ## 1) Scope and routing model (first)
 - [x] Confirm multi-route scope: multiple Gmail sources -> multiple destination folders in one Outlook mailbox.
 - [x] Define route config object: `gmail_email`, `outlook_email`, `outlook_target_folder`, token refs, route options.
@@ -64,7 +66,7 @@ Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph
 - [x] Add `--dry-run` to log candidate copies without APPEND.
 
 ## 9) Runtime and operations
-- [ ] CLI modes:
+- [x] CLI modes:
 - [x] `run-once`
 - [x] `lambda` (event-driven handler for scheduled execution)
 - [x] EventBridge schedule every `5 minutes` to invoke Lambda.
@@ -76,36 +78,36 @@ Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph
 - [x] DynamoDB idempotency conditional write/finalize behavior.
 - [x] UIDVALIDITY change and fallback resync logic.
 - [x] RFC822 SHA256 + Message-ID extraction.
-- [ ] Multi-route isolation (state for one route does not affect another).
+- [x] Multi-route isolation (state for one route does not affect another).
 
 ## 11) CI/CD automation (GitHub Actions -> AWS)
 - [x] Add workflow to run lint/tests on pull requests and pushes.
 - [x] Add deployment workflow to auto-deploy on push/commit to the deployment branch (ex: `main`).
 - [x] Use GitHub OIDC to assume AWS IAM role (prefer over long-lived AWS keys).
 - [x] Build/package Lambda artifact, then deploy via SAM/CDK/Terraform.
-- [ ] Add environment protections (required reviewers for prod environment if needed).
-- [ ] Ensure deployment is idempotent and includes rollback/failure visibility in logs.
+- [x] Add environment protections (required reviewers for prod environment if needed).
+- [x] Ensure deployment is idempotent and includes rollback/failure visibility in logs.
 
 ## 12) Deployment artifacts and docs
-- [ ] AWS Lambda deployment docs:
-- [ ] EventBridge `rate(5 minutes)` -> Lambda trigger.
-- [ ] DynamoDB table with TTL enabled.
-- [ ] IAM least-privilege policy for DynamoDB + CloudWatch Logs + Secrets Manager/SSM (if used).
-- [ ] VPC guidance only if required by networking policy (avoid VPC unless needed).
-- [ ] Lambda package/dependency build steps (zip or Lambda layer).
-- [ ] Optional DLQ/on-failure destination and CloudWatch alarm recommendations.
-- [ ] README OAuth setup:
-- [ ] Google Cloud app + IMAP scopes.
-- [ ] Azure app registration for Outlook.com IMAP OAuth (`tenant=consumers`) permissions.
-- [ ] Include full file tree, then code for each file.
+- [x] AWS Lambda deployment docs:
+- [x] EventBridge `rate(5 minutes)` -> Lambda trigger.
+- [x] DynamoDB table with TTL enabled.
+- [x] IAM least-privilege policy for DynamoDB + CloudWatch Logs + Secrets Manager/SSM (if used).
+- [x] VPC guidance only if required by networking policy (avoid VPC unless needed).
+- [x] Lambda package/dependency build steps (zip or Lambda layer).
+- [x] Optional DLQ/on-failure destination and CloudWatch alarm recommendations.
+- [x] README OAuth setup:
+- [x] Google Cloud app + IMAP scopes.
+- [x] Azure app registration for Outlook.com IMAP OAuth (`tenant=consumers`) permissions.
+- [x] Include full file tree, then code for each file.
 
 ## 13) Config checklist
 - [x] Base: `AWS_REGION`, `DYNAMODB_TABLE`, `SYNC_INTERVAL_SECONDS=300`, `LOG_LEVEL=INFO`
-- [ ] Lambda: `AWS_LAMBDA_FUNCTION_NAME` (runtime-detected optional), timeout/memory/env configuration documented.
+- [x] Lambda: `AWS_LAMBDA_FUNCTION_NAME` (runtime-detected optional), timeout/memory/env configuration documented.
 - [x] Secret storage: define whether tokens come from env vars, AWS Secrets Manager, or SSM Parameter Store.
-- [ ] GitHub Actions secrets/vars:
+- [x] GitHub Actions secrets/vars:
 - [x] `AWS_ROLE_ARN` (OIDC assume role target)
 - [x] `AWS_REGION`
-- [ ] deployment environment name and branch mapping
+- [x] deployment environment name and branch mapping
 - [x] Outlook shared mailbox: `OUTLOOK_EMAIL`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` (if used), `MS_TENANT=consumers`, `MS_REFRESH_TOKEN`
 - [x] Route-level Gmail creds per source account (in route config): `GMAIL_EMAIL`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, plus `OUTLOOK_TARGET_FOLDER`

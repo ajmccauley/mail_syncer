@@ -64,9 +64,11 @@ Use conventional commits:
 
 ## CI/CD Deployment
 - `main` branch pushes trigger automatic AWS deployment via GitHub Actions.
+- Manual `workflow_dispatch` deploys are supported with deploy environment input.
 - Use GitHub OIDC to assume AWS role; do not store long-lived AWS keys in repo secrets.
 - Required workflow stages: lint -> tests -> package -> deploy.
-- Deployment must be idempotent and emit logs/artifacts for failure diagnosis.
+- Deployment uses workflow concurrency control and uploads deploy logs as artifacts.
+- Deployment must remain idempotent (`--no-fail-on-empty-changeset`).
 
 ## Security & Configuration Tips
 - Never commit secrets (`*_REFRESH_TOKEN`, client secrets, AWS credentials).

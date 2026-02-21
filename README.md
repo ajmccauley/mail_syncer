@@ -1,27 +1,37 @@
 # mail_syncer
 
-IMAP-to-IMAP sync service that copies new messages from one or more Gmail inboxes into folders in a single Outlook.com mailbox, with DynamoDB-backed idempotent state.
+IMAP-to-IMAP sync service that copies new messages from one or more Gmail inboxes into folders in one Outlook.com mailbox, with DynamoDB-backed idempotent state.
 
-## Current Status
-Implemented:
-- Multi-route configuration loading (`SYNC_ROUTES_JSON` or single-route fallback env vars).
-- Lambda and local CLI entrypoints.
-- DynamoDB fail-safe gate (abort before any IMAP action when unavailable).
-- Real Gmail/Outlook IMAP clients with XOAUTH2 authentication.
-- Incremental sync engine:
-- route-by-route processing in a single invocation,
-- UIDVALIDITY-aware fetch strategy (`UID > last_uid` and fallback `SINCE` window),
-- per-message APPEND with continue-on-failure behavior.
-- DynamoDB state schema operations:
-- `WATERMARK`,
-- conditional `UID#...` claim/finalize flow,
-- `FAIL#...` retry tracking,
-- fingerprint dedupe support for UIDVALIDITY changes.
-- CI/CD and AWS SAM deployment scaffolding.
-
-Still in progress:
-- interactive OAuth helper commands,
-- production hardening/docs completion (IAM examples, OAuth setup walkthroughs).
+## File Tree
+```text
+.
+├── .env.example
+├── .github/workflows/
+│   ├── ci.yml
+│   └── deploy.yml
+├── infra/
+│   └── template.yaml
+├── src/
+│   ├── config.py
+│   ├── dynamodb_state.py
+│   ├── gmail_imap.py
+│   ├── imap_utils.py
+│   ├── lambda_handler.py
+│   ├── logging_utils.py
+│   ├── main.py
+│   ├── oauth_gmail.py
+│   ├── oauth_microsoft.py
+│   ├── outlook_imap.py
+│   ├── secrets_config.py
+│   └── sync_engine.py
+└── tests/
+    ├── test_config.py
+    ├── test_dynamodb_state.py
+    ├── test_fail_safe.py
+    ├── test_imap_utils.py
+    ├── test_secrets_config.py
+    └── test_sync_engine.py
+```
 
 ## Local Development
 ```bash
@@ -32,35 +42,105 @@ pytest -q
 python -m src.main run-once --dry-run
 ```
 
-## First-Run OAuth Helpers
-Use local interactive flows to obtain refresh tokens (not inside Lambda):
+## Runtime Modes
+- `python -m src.main run-once [--dry-run]`: one sync cycle.
+- `python -m src.main lambda`: run Lambda-style cycle locally.
 
+## First-Run OAuth Setup
+Run these locally (not in Lambda), then store returned refresh tokens in AWS Secrets Manager.
+
+### Google (Gmail IMAP)
+1. Google Cloud Console -> create OAuth client (`Web application`).
+2. Add redirect URI: `http://127.0.0.1:8765/callback`.
+3. Ensure scope includes `https://mail.google.com/`.
+4. Run:
 ```bash
-python -m src.main auth gmail --client-id "$GMAIL_CLIENT_ID" --client-secret "$GMAIL_CLIENT_SECRET"
-python -m src.main auth microsoft --client-id "$MS_CLIENT_ID" --client-secret "$MS_CLIENT_SECRET" --tenant consumers
+python -m src.main auth gmail \
+  --client-id "$GMAIL_CLIENT_ID" \
+  --client-secret "$GMAIL_CLIENT_SECRET"
 ```
 
-Optional direct write to Secrets Manager:
+### Microsoft (Outlook IMAP)
+1. Azure App Registration (`tenant=consumers` for personal Outlook).
+2. Redirect URI: `http://127.0.0.1:8766/callback`.
+3. Delegated permission: `IMAP.AccessAsUser.All` (+ `offline_access` scope).
+4. Run:
+```bash
+python -m src.main auth microsoft \
+  --tenant consumers \
+  --client-id "$MS_CLIENT_ID" \
+  --client-secret "$MS_CLIENT_SECRET"
+```
 
+### Optional: write token directly to Secrets Manager
 ```bash
 python -m src.main auth gmail --write-secret-id mail-syncer/routes --write-secret-key GMAIL_REFRESH_TOKEN
 python -m src.main auth microsoft --write-secret-id mail-syncer/outlook --write-secret-key MS_REFRESH_TOKEN
 ```
 
-Both commands print JSON containing the new refresh token and an `env_export` snippet.
-
-## AWS Deployment
-- GitHub Actions handles CI and deployment on `main` pushes.
-- Deployment template: `infra/template.yaml`.
-- Configure repository secrets/variables:
-- `AWS_ROLE_ARN`
-- `AWS_REGION`
-- `DEPLOY_ENV` (example: `prod`)
-
 ## Configuration
-Start with `.env.example` and set values from your secret manager.
+Start from `.env.example`.
 
-For Lambda, prefer AWS Secrets Manager:
-- Set `AWS_SECRETS_MANAGER_SECRET_IDS` to one or more secret IDs/ARNs.
-- Each secret must be a JSON object. Keys are merged into runtime env.
-- Explicit Lambda env vars override secret values.
+Important variables:
+- `AWS_REGION`
+- `DYNAMODB_TABLE`
+- `AWS_LAMBDA_FUNCTION_NAME` (optional, runtime-provided in Lambda)
+- `OUTLOOK_EMAIL`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_TENANT`, `MS_REFRESH_TOKEN`
+- `SYNC_ROUTES_JSON` (array of route objects with Gmail creds + destination folder)
+
+Secrets loading:
+- Set `AWS_SECRETS_MANAGER_SECRET_IDS` to comma-separated secret IDs/ARNs.
+- Each secret must contain a JSON object; keys are merged into env.
+- Explicit env vars override secret values.
+
+## AWS Lambda Deployment
+Deployment is via SAM template `infra/template.yaml`.
+
+### What gets created
+- Lambda function (`src/lambda_handler.handler`)
+- DynamoDB table with TTL (`ttl` attribute)
+- EventBridge rule `rate(5 minutes)` to invoke Lambda
+
+### Packaging and deploy commands
+```bash
+sam build --template-file infra/template.yaml
+sam deploy \
+  --stack-name mail-syncer-prod \
+  --template-file .aws-sam/build/template.yaml \
+  --capabilities CAPABILITY_IAM \
+  --no-confirm-changeset \
+  --no-fail-on-empty-changeset \
+  --resolve-s3
+```
+
+### IAM notes
+Least privilege for runtime should include:
+- DynamoDB: `DescribeTable`, `GetItem`, `PutItem`, `UpdateItem`, `Query`
+- CloudWatch Logs write permissions
+- Secrets Manager: `GetSecretValue` for only required secret ARNs
+
+### VPC guidance
+Do not attach Lambda to a VPC unless your org/network policy requires it. IMAP endpoints are public and VPC networking adds NAT complexity and latency.
+
+### Optional reliability hardening
+- Add Lambda DLQ (SQS) or on-failure destination.
+- Add CloudWatch alarms:
+- Lambda `Errors > 0`
+- Lambda duration near timeout
+- DynamoDB throttles/read-write errors
+
+## GitHub Actions CI/CD
+- `ci.yml`: lint + tests on PRs/pushes.
+- `deploy.yml`: deploy on `main` pushes and manual dispatch.
+- AWS auth uses GitHub OIDC with `AWS_ROLE_ARN`.
+- Deploy uses `--no-fail-on-empty-changeset` for idempotent re-runs.
+- Deployment logs are uploaded as workflow artifacts.
+
+Required repo configuration:
+- Secret: `AWS_ROLE_ARN`
+- Variables: `AWS_REGION`, `DEPLOY_ENV`
+- Environment protection: configure required reviewers on GitHub `production` environment if needed.
+
+Branch/environment mapping:
+- `main` push -> `production` environment (default `DEPLOY_ENV=prod`)
+- manual dispatch can override target deploy environment through workflow inputs.
