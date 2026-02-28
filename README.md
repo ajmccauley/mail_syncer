@@ -11,6 +11,10 @@ IMAP-to-IMAP sync service that copies new messages from one or more Gmail inboxe
 │   └── deploy.yml
 ├── infra/
 │   └── template.yaml
+├── scripts/
+│   ├── check_latest_deploy.py
+│   ├── create_dynamodb_table.sh
+│   └── migrate_secrets_to_ssm.py
 ├── src/
 │   ├── config.py
 │   ├── dynamodb_state.py
@@ -47,7 +51,7 @@ python -m src.main run-once --dry-run
 - `python -m src.main lambda`: run Lambda-style cycle locally.
 
 ## First-Run OAuth Setup
-Run these locally (not in Lambda), then store returned refresh tokens in AWS Secrets Manager.
+Run these locally (not in Lambda), then store returned refresh tokens in AWS SSM Parameter Store (`SecureString`).
 
 ### Google (Gmail IMAP)
 1. Google Cloud Console -> create OAuth client (`Web application`).
@@ -72,7 +76,13 @@ python -m src.main auth microsoft \
   --client-secret "$MS_CLIENT_SECRET"
 ```
 
-### Optional: write token directly to Secrets Manager
+### Optional: write token directly to SSM Parameter Store
+```bash
+python -m src.main auth gmail --write-parameter-name /mail-syncer/routes --write-parameter-key GMAIL_REFRESH_TOKEN
+python -m src.main auth microsoft --write-parameter-name /mail-syncer/outlook --write-parameter-key MS_REFRESH_TOKEN
+```
+
+Legacy fallback during migration:
 ```bash
 python -m src.main auth gmail --write-secret-id mail-syncer/routes --write-secret-key GMAIL_REFRESH_TOKEN
 python -m src.main auth microsoft --write-secret-id mail-syncer/outlook --write-secret-key MS_REFRESH_TOKEN
@@ -88,10 +98,17 @@ Important variables:
 - `OUTLOOK_EMAIL`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_TENANT`, `MS_REFRESH_TOKEN`
 - `SYNC_ROUTES_JSON` (array of route objects with Gmail creds + destination folder)
 
-Secrets loading:
-- Set `AWS_SECRETS_MANAGER_SECRET_IDS` to comma-separated secret IDs/ARNs.
-- Each secret must contain a JSON object; keys are merged into env.
-- Explicit env vars override secret values.
+Config-store loading:
+- Set `AWS_SSM_PARAMETER_NAMES` to comma-separated SSM parameter names.
+- Each parameter value must be a JSON object; keys are merged into env.
+- Optional migration fallback: `AWS_SECRETS_MANAGER_SECRET_IDS` (legacy).
+- Explicit env vars override loaded values.
+- Parameter Store is the default to reduce recurring secret-storage cost for this workload.
+
+Example:
+```bash
+AWS_SSM_PARAMETER_NAMES=/mail-syncer/outlook,/mail-syncer/routes
+```
 
 ## AWS Lambda Deployment
 Deployment is via **AWS SAM**, which generates and deploys **CloudFormation**.  
@@ -116,28 +133,28 @@ sam deploy \
 
 ### One-time GitHub setup (required)
 1. In repository **Settings -> Secrets and variables -> Actions**:
-- Secret: `AWS_ROLE_ARN` (OIDC-assumable deploy role in your AWS account)
-  - Fallback supported: repository/environment variable `AWS_ROLE_ARN`
-- Variables:
-  - `AWS_REGION` (example: `us-west-2`)
-  - `DEPLOY_ENV` (example: `prod`)
-  - `AWS_SECRETS_MANAGER_SECRET_IDS` (example: `mail-syncer/routes,mail-syncer/outlook`)
-    - Set value only (no `KEY=` prefix).
-  - Optional runtime tuning:
-    - `STACK_NAME` (override default `mail-syncer-${DEPLOY_ENV}`)
-    - `SCHEDULE_EXPRESSION` (example: `rate(5 minutes)`)
-    - `LAMBDA_MEMORY_SIZE` (example: `512`)
-    - `LAMBDA_TIMEOUT_SECONDS` (example: `120`)
-    - `LOG_LEVEL` (example: `INFO`)
-    - `SYNC_INTERVAL_SECONDS` (example: `300`)
+   - Secret: `AWS_ROLE_ARN` (OIDC-assumable deploy role in your AWS account).
+   - Fallback supported: repository/environment variable `AWS_ROLE_ARN`.
+   - Variables:
+     - `AWS_REGION` (example: `us-west-2`)
+     - `DEPLOY_ENV` (example: `prod`)
+     - `AWS_SSM_PARAMETER_NAMES` (example: `/mail-syncer/routes,/mail-syncer/outlook`)
+       - Set value only (no `KEY=` prefix).
+   - Optional runtime tuning variables:
+     - `STACK_NAME` (override default `mail-syncer-${DEPLOY_ENV}`)
+     - `SCHEDULE_EXPRESSION` (example: `rate(5 minutes)`)
+     - `LAMBDA_MEMORY_SIZE` (example: `512`)
+     - `LAMBDA_TIMEOUT_SECONDS` (example: `120`)
+     - `LOG_LEVEL` (example: `INFO`)
+     - `SYNC_INTERVAL_SECONDS` (example: `300`)
 2. In **Settings -> Environments -> production**, add reviewers if you want approval gates.
-3. Ensure IAM role in `AWS_ROLE_ARN` trusts GitHub OIDC and allows CloudFormation/SAM/Lambda/DynamoDB/EventBridge/Logs/Secrets actions for this stack.
+3. Ensure IAM role in `AWS_ROLE_ARN` trusts GitHub OIDC and allows CloudFormation/SAM/Lambda/DynamoDB/EventBridge/Logs/SSM actions for this stack.
 
 ### IAM notes
 Least privilege for runtime should include:
 - DynamoDB: `DescribeTable`, `GetItem`, `PutItem`, `UpdateItem`, `Query`
 - CloudWatch Logs write permissions
-- Secrets Manager: `GetSecretValue` for only required secret ARNs
+- SSM Parameter Store: `ssm:GetParameter`, `ssm:GetParameters` for only required parameter ARNs
 
 ### VPC guidance
 Do not attach Lambda to a VPC unless your org/network policy requires it. IMAP endpoints are public and VPC networking adds NAT complexity and latency.
@@ -160,8 +177,20 @@ Do not attach Lambda to a VPC unless your org/network policy requires it. IMAP e
 
 Required repo configuration:
 - Secret: `AWS_ROLE_ARN`
-- Variables: `AWS_REGION`, `DEPLOY_ENV`, `AWS_SECRETS_MANAGER_SECRET_IDS`
+- Variables: `AWS_REGION`, `DEPLOY_ENV`, `AWS_SSM_PARAMETER_NAMES`
 - Environment protection: configure required reviewers on GitHub `production` environment if needed.
+- Migration note: deploy workflow temporarily falls back to legacy `AWS_SECRETS_MANAGER_SECRET_IDS` if `AWS_SSM_PARAMETER_NAMES` is unset.
+
+## Migration: Secrets Manager -> Parameter Store
+Use this script to copy existing JSON secrets into SSM SecureString parameters.
+
+```bash
+python3 scripts/migrate_secrets_to_ssm.py \
+  --region us-west-2 \
+  --mapping mail-syncer/routes=/mail-syncer/routes \
+  --mapping mail-syncer/outlook=/mail-syncer/outlook \
+  --overwrite
+```
 
 Branch/environment mapping:
 - `main` push -> `production` environment (default `DEPLOY_ENV=prod`)

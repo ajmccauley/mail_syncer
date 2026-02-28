@@ -25,7 +25,7 @@ env:
   LAMBDA_TIMEOUT_SECONDS: ${{ vars.LAMBDA_TIMEOUT_SECONDS || '120' }}
   LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
   SYNC_INTERVAL_SECONDS: ${{ vars.SYNC_INTERVAL_SECONDS || '300' }}
-  AWS_SECRETS_MANAGER_SECRET_IDS: ${{ vars.AWS_SECRETS_MANAGER_SECRET_IDS || '' }}
+  AWS_SSM_PARAMETER_NAMES: ${{ vars.AWS_SSM_PARAMETER_NAMES || vars.AWS_SECRETS_MANAGER_SECRET_IDS || '' }}
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -69,8 +69,8 @@ jobs:
 
       - name: Normalize deploy variables
         run: |
-          SANITIZED_SECRETS="${AWS_SECRETS_MANAGER_SECRET_IDS#AWS_SECRETS_MANAGER_SECRET_IDS=}"
-          echo "AWS_SECRETS_MANAGER_SECRET_IDS=${SANITIZED_SECRETS}" >> "${GITHUB_ENV}"
+          SANITIZED_SSM="${AWS_SSM_PARAMETER_NAMES#AWS_SSM_PARAMETER_NAMES=}"
+          echo "AWS_SSM_PARAMETER_NAMES=${SANITIZED_SSM}" >> "${GITHUB_ENV}"
 
       - name: Handle rollback-complete stack
         run: |
@@ -97,7 +97,7 @@ jobs:
             "LambdaTimeoutSeconds=${LAMBDA_TIMEOUT_SECONDS}"
             "LogLevel=${LOG_LEVEL}"
             "SyncIntervalSeconds=${SYNC_INTERVAL_SECONDS}"
-            "SecretsManagerSecretIds=${AWS_SECRETS_MANAGER_SECRET_IDS}"
+            "SsmParameterNames=${AWS_SSM_PARAMETER_NAMES}"
           )
           if [ -n "${SCHEDULE_EXPRESSION}" ]; then
             # Include quotes in value so SAM keeps expressions that contain spaces.

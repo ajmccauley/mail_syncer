@@ -2,21 +2,22 @@
 
 Build a production-ready IMAP-to-IMAP sync app (no Gmail API, no Microsoft Graph) that copies new Gmail INBOX mail into Outlook.com folders with full RFC822 fidelity and strict idempotency.
 
-Status: baseline implementation and live GitHub Actions deployment are complete. New top-priority cost optimization is now pending.
+Status: baseline implementation and live GitHub Actions deployment are complete. Parameter Store migration is implemented and awaiting AWS runtime validation/cutover cleanup.
 
 ## 0) Top Priority: Secrets Cost Optimization (NEW)
-- [ ] Replace AWS Secrets Manager usage with AWS Systems Manager Parameter Store (`SecureString`) for runtime token/config loading.
-- [ ] Update config loader to support Parameter Store source(s) as first-class input (and make it the default path).
-- [ ] Update Lambda IAM policy to allow `ssm:GetParameter` / `ssm:GetParameters` and remove Secrets Manager dependency.
-- [ ] Update SAM parameters and env vars:
-- [ ] Add Parameter Store identifiers variable (example: `AWS_SSM_PARAMETER_NAMES`).
-- [ ] Deprecate/remove `AWS_SECRETS_MANAGER_SECRET_IDS` from deploy defaults.
-- [ ] Add migration script/runbook:
-- [ ] Read existing `mail-syncer/routes` and `mail-syncer/outlook` secrets.
-- [ ] Write equivalent Parameter Store entries.
-- [ ] Validate Lambda can run with Parameter Store only.
-- [ ] Update docs (`README.md`, `AGENTS.md`, `.env.example`) to reflect Parameter Store-first setup and cost rationale.
-- [ ] Rollback plan: keep temporary dual-read support (Secrets Manager + Parameter Store) during migration window, then remove Secrets Manager path.
+- [x] Replace AWS Secrets Manager usage with AWS Systems Manager Parameter Store (`SecureString`) for runtime token/config loading.
+- [x] Update config loader to support Parameter Store source(s) as first-class input (and make it the default path).
+- [x] Update Lambda IAM policy to allow `ssm:GetParameter` / `ssm:GetParameters` and remove Secrets Manager dependency from runtime template.
+- [x] Update SAM parameters and env vars.
+- [x] Add Parameter Store identifiers variable (`AWS_SSM_PARAMETER_NAMES`).
+- [x] Deprecate/remove `AWS_SECRETS_MANAGER_SECRET_IDS` from deploy defaults.
+- [x] Add migration script/runbook.
+- [x] Read existing `mail-syncer/routes` and `mail-syncer/outlook` secrets.
+- [x] Write equivalent Parameter Store entries.
+- [ ] Validate Lambda can run with Parameter Store only in AWS after next deploy.
+- [x] Update docs (`README.md`, `AGENTS.md`, `.env.example`) to reflect Parameter Store-first setup and cost rationale.
+- [x] Rollback plan: keep temporary dual-read support (Secrets Manager + Parameter Store) during migration window.
+- [ ] Post-migration cleanup: remove legacy `AWS_SECRETS_MANAGER_SECRET_IDS` loader path after cutover window.
 
 ## 1) Scope and routing model (first)
 - [x] Confirm multi-route scope: multiple Gmail sources -> multiple destination folders in one Outlook mailbox.

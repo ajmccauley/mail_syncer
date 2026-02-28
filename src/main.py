@@ -60,7 +60,12 @@ def _build_parser() -> argparse.ArgumentParser:
     auth_gmail.add_argument("--listen-port", type=int, default=8765)
     auth_gmail.add_argument("--timeout-seconds", type=int, default=180)
     auth_gmail.add_argument("--no-browser", action="store_true")
-    auth_gmail.add_argument("--write-secret-id")
+    auth_gmail.add_argument("--write-parameter-name")
+    auth_gmail.add_argument("--write-parameter-key", default="GMAIL_REFRESH_TOKEN")
+    auth_gmail.add_argument(
+        "--write-secret-id",
+        help="Deprecated: write refresh token to Secrets Manager JSON secret",
+    )
     auth_gmail.add_argument("--write-secret-key", default="GMAIL_REFRESH_TOKEN")
     auth_gmail.add_argument("--aws-region")
 
@@ -75,7 +80,12 @@ def _build_parser() -> argparse.ArgumentParser:
     auth_microsoft.add_argument("--listen-port", type=int, default=8766)
     auth_microsoft.add_argument("--timeout-seconds", type=int, default=180)
     auth_microsoft.add_argument("--no-browser", action="store_true")
-    auth_microsoft.add_argument("--write-secret-id")
+    auth_microsoft.add_argument("--write-parameter-name")
+    auth_microsoft.add_argument("--write-parameter-key", default="MS_REFRESH_TOKEN")
+    auth_microsoft.add_argument(
+        "--write-secret-id",
+        help="Deprecated: write refresh token to Secrets Manager JSON secret",
+    )
     auth_microsoft.add_argument("--write-secret-key", default="MS_REFRESH_TOKEN")
     auth_microsoft.add_argument("--aws-region")
     return parser
@@ -144,6 +154,39 @@ def _secrets_client(*, region_name: str | None) -> Any:
     return boto3.client("secretsmanager", **kwargs)
 
 
+def _ssm_client(*, region_name: str | None) -> Any:
+    try:
+        import boto3
+    except ImportError as exc:
+        raise RuntimeError(
+            "boto3 is required for writing AWS SSM Parameter Store values"
+        ) from exc
+    kwargs: dict[str, Any] = {}
+    if region_name:
+        kwargs["region_name"] = region_name
+    return boto3.client("ssm", **kwargs)
+
+
+def _load_json_object(raw: str, *, source: str) -> dict[str, Any]:
+    try:
+        loaded = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{source} must contain a JSON object: {exc}") from exc
+    if not isinstance(loaded, dict):
+        raise RuntimeError(f"{source} must contain a JSON object")
+    return loaded
+
+
+def _is_ssm_parameter_not_found(*, client: Any, exc: Exception) -> bool:
+    exceptions = getattr(client, "exceptions", None)
+    if exceptions is None:
+        return False
+    parameter_not_found = getattr(exceptions, "ParameterNotFound", None)
+    if parameter_not_found is None:
+        return False
+    return isinstance(exc, parameter_not_found)
+
+
 def _write_secret_key(
     *,
     secret_id: str,
@@ -156,9 +199,7 @@ def _write_secret_key(
     try:
         response = client.get_secret_value(SecretId=secret_id)
         secret_string = response.get("SecretString", "{}")
-        loaded = json.loads(secret_string)
-        if isinstance(loaded, dict):
-            current = loaded
+        current = _load_json_object(secret_string, source=f"secret {secret_id}")
     except Exception:
         # If secret read fails, write will likely fail too; we still attempt and surface
         # the final error to the caller.
@@ -169,6 +210,54 @@ def _write_secret_key(
         SecretId=secret_id,
         SecretString=json.dumps(current, separators=(",", ":")),
     )
+
+
+def _write_parameter_key(
+    *,
+    parameter_name: str,
+    key: str,
+    value: str,
+    region_name: str | None,
+) -> None:
+    client = _ssm_client(region_name=region_name)
+    current: dict[str, Any] = {}
+    try:
+        response = client.get_parameter(Name=parameter_name, WithDecryption=True)
+    except Exception as exc:
+        if not _is_ssm_parameter_not_found(client=client, exc=exc):
+            raise
+    else:
+        parameter_value = response.get("Parameter", {}).get("Value", "{}")
+        current = _load_json_object(
+            str(parameter_value),
+            source=f"parameter {parameter_name}",
+        )
+
+    current[key] = value
+    client.put_parameter(
+        Name=parameter_name,
+        Type="SecureString",
+        Value=json.dumps(current, separators=(",", ":")),
+        Overwrite=True,
+    )
+
+
+def _resolve_token_store(
+    args: argparse.Namespace,
+    *,
+    default_key: str,
+) -> tuple[str, str, str] | None:
+    parameter_name = (args.write_parameter_name or "").strip()
+    secret_id = (args.write_secret_id or "").strip()
+    if parameter_name and secret_id:
+        raise ValueError(
+            "Use only one output target: --write-parameter-name or --write-secret-id."
+        )
+    if parameter_name:
+        return ("parameter", parameter_name, args.write_parameter_key or default_key)
+    if secret_id:
+        return ("secret", secret_id, args.write_secret_key or default_key)
+    return None
 
 
 def _run_auth_gmail(args: argparse.Namespace) -> int:
@@ -201,17 +290,34 @@ def _run_auth_gmail(args: argparse.Namespace) -> int:
         print(f"Gmail OAuth error: {exc}", file=sys.stderr)
         return 1
 
-    if args.write_secret_id:
+    try:
+        token_store = _resolve_token_store(args, default_key="GMAIL_REFRESH_TOKEN")
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if token_store:
+        store_type, destination, key = token_store
         try:
-            _write_secret_key(
-                secret_id=args.write_secret_id,
-                key=args.write_secret_key,
-                value=result.refresh_token,
-                region_name=args.aws_region or env.get("AWS_REGION"),
-            )
+            if store_type == "parameter":
+                _write_parameter_key(
+                    parameter_name=destination,
+                    key=key,
+                    value=result.refresh_token,
+                    region_name=args.aws_region or env.get("AWS_REGION"),
+                )
+            else:
+                _write_secret_key(
+                    secret_id=destination,
+                    key=key,
+                    value=result.refresh_token,
+                    region_name=args.aws_region or env.get("AWS_REGION"),
+                )
         except Exception as exc:
-            print(f"Failed to write secret: {exc}", file=sys.stderr)
+            print(f"Failed to persist token: {exc}", file=sys.stderr)
             return 1
+    else:
+        key = args.write_parameter_key
 
     print(
         json.dumps(
@@ -221,9 +327,21 @@ def _run_auth_gmail(args: argparse.Namespace) -> int:
                 "access_token": result.access_token,
                 "expires_at_epoch": result.expires_at_epoch,
                 "scope": result.scope,
-                "env_export": f"{args.write_secret_key}={result.refresh_token}",
-                "secret_updated": bool(args.write_secret_id),
-                "secret_id": args.write_secret_id,
+                "env_export": f"{key}={result.refresh_token}",
+                "parameter_updated": bool(
+                    token_store and token_store[0] == "parameter"
+                ),
+                "parameter_name": (
+                    token_store[1]
+                    if token_store and token_store[0] == "parameter"
+                    else None
+                ),
+                "secret_updated": bool(token_store and token_store[0] == "secret"),
+                "secret_id": (
+                    token_store[1]
+                    if token_store and token_store[0] == "secret"
+                    else None
+                ),
             }
         )
     )
@@ -261,17 +379,34 @@ def _run_auth_microsoft(args: argparse.Namespace) -> int:
         print(f"Microsoft OAuth error: {exc}", file=sys.stderr)
         return 1
 
-    if args.write_secret_id:
+    try:
+        token_store = _resolve_token_store(args, default_key="MS_REFRESH_TOKEN")
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if token_store:
+        store_type, destination, key = token_store
         try:
-            _write_secret_key(
-                secret_id=args.write_secret_id,
-                key=args.write_secret_key,
-                value=result.refresh_token,
-                region_name=args.aws_region or env.get("AWS_REGION"),
-            )
+            if store_type == "parameter":
+                _write_parameter_key(
+                    parameter_name=destination,
+                    key=key,
+                    value=result.refresh_token,
+                    region_name=args.aws_region or env.get("AWS_REGION"),
+                )
+            else:
+                _write_secret_key(
+                    secret_id=destination,
+                    key=key,
+                    value=result.refresh_token,
+                    region_name=args.aws_region or env.get("AWS_REGION"),
+                )
         except Exception as exc:
-            print(f"Failed to write secret: {exc}", file=sys.stderr)
+            print(f"Failed to persist token: {exc}", file=sys.stderr)
             return 1
+    else:
+        key = args.write_parameter_key
 
     print(
         json.dumps(
@@ -281,9 +416,21 @@ def _run_auth_microsoft(args: argparse.Namespace) -> int:
                 "access_token": result.access_token,
                 "expires_at_epoch": result.expires_at_epoch,
                 "scope": result.scope,
-                "env_export": f"{args.write_secret_key}={result.refresh_token}",
-                "secret_updated": bool(args.write_secret_id),
-                "secret_id": args.write_secret_id,
+                "env_export": f"{key}={result.refresh_token}",
+                "parameter_updated": bool(
+                    token_store and token_store[0] == "parameter"
+                ),
+                "parameter_name": (
+                    token_store[1]
+                    if token_store and token_store[0] == "parameter"
+                    else None
+                ),
+                "secret_updated": bool(token_store and token_store[0] == "secret"),
+                "secret_id": (
+                    token_store[1]
+                    if token_store and token_store[0] == "secret"
+                    else None
+                ),
             }
         )
     )

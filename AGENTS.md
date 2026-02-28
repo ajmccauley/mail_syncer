@@ -23,6 +23,7 @@ Use a local virtualenv and run modules from repo root.
 - `python -m src.main run-once --dry-run`: execute one sync cycle safely.
 - `python -m src.main lambda`: run one Lambda-style cycle locally.
 - `python -m src.main auth gmail` / `python -m src.main auth microsoft`: run interactive OAuth helpers.
+- `python3 scripts/migrate_secrets_to_ssm.py --mapping old-secret=/new-parameter`: migrate legacy Secrets Manager JSON values to SSM SecureString.
 - `python3 scripts/check_latest_deploy.py`: inspect latest deploy run status and error-tail from logs/artifact.
 - `pytest -q`: run tests.
 - `ruff check src tests && ruff format src tests`: lint and format.
@@ -61,7 +62,8 @@ Use conventional commits:
 - Maintain idempotency via DynamoDB conditional UID claim and finalize flow.
 - Keep route-level failures isolated; do not abort the whole invocation when one route fails.
 - Interactive OAuth token helper commands are implemented for local first-run provisioning.
-- Use `--write-secret-id` and `--write-secret-key` to write refreshed tokens into Secrets Manager.
+- Prefer `--write-parameter-name` and `--write-parameter-key` to write refreshed tokens into SSM Parameter Store (`SecureString`).
+- `--write-secret-id` remains as temporary migration fallback only.
 
 ## CI/CD Deployment
 - `main` branch pushes trigger automatic AWS deployment via GitHub Actions.
@@ -76,7 +78,8 @@ Use conventional commits:
 
 ## Security & Configuration Tips
 - Never commit secrets (`*_REFRESH_TOKEN`, client secrets, AWS credentials).
-- Use env vars, AWS Secrets Manager, or SSM Parameter Store; keep `.env.example` non-sensitive.
-- `AWS_SECRETS_MANAGER_SECRET_IDS` supports comma-separated JSON secrets merged at runtime.
+- Use env vars or AWS SSM Parameter Store; keep `.env.example` non-sensitive.
+- `AWS_SSM_PARAMETER_NAMES` supports comma-separated JSON parameters merged at runtime.
+- `AWS_SECRETS_MANAGER_SECRET_IDS` is deprecated and retained only for migration rollback.
 - Do not set Lambda-reserved environment keys (for example `AWS_REGION`) in SAM template env vars.
 - Fail safe on DynamoDB errors: do not perform IMAP actions when state backend is unavailable.

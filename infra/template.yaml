@@ -27,7 +27,7 @@ Parameters:
     Default: 300
     MinValue: 60
     MaxValue: 86400
-  SecretsManagerSecretIds:
+  SsmParameterNames:
     Type: String
     Default: ""
 
@@ -65,7 +65,7 @@ Resources:
           DYNAMODB_TABLE: !Ref MailSyncerStateTable
           LOG_LEVEL: !Ref LogLevel
           SYNC_INTERVAL_SECONDS: !Sub "${SyncIntervalSeconds}"
-          AWS_SECRETS_MANAGER_SECRET_IDS: !Ref SecretsManagerSecretIds
+          AWS_SSM_PARAMETER_NAMES: !Ref SsmParameterNames
       Policies:
         - AWSLambdaBasicExecutionRole
         - Statement:
@@ -79,7 +79,8 @@ Resources:
               Resource: !GetAtt MailSyncerStateTable.Arn
             - Effect: Allow
               Action:
-                - secretsmanager:GetSecretValue
+                - ssm:GetParameter
+                - ssm:GetParameters
               Resource: "*"
       Events:
         ScheduledSync:
